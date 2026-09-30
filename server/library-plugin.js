@@ -8,7 +8,7 @@ const APK_EXT = new Set([".apk"]);
 const MAX_BYTES = 200 * 1024 * 1024;
 
 function emptyLib() {
-  return { apks: [], activeApkId: "", videos: [], nextIndex: 0 };
+  return { apks: [], activeApkId: "", videos: [], nextIndex: 0, nextApkIndex: 0 };
 }
 
 export function libraryApi(root) {
@@ -36,6 +36,7 @@ export function libraryApi(root) {
         activeApkId,
         videos: Array.isArray(data.videos) ? data.videos : [],
         nextIndex: Number.isFinite(Number(data.nextIndex)) ? Number(data.nextIndex) : 0,
+        nextApkIndex: Number.isFinite(Number(data.nextApkIndex)) ? Number(data.nextApkIndex) : 0,
       };
     } catch (e) {
       return emptyLib();
@@ -49,6 +50,7 @@ export function libraryApi(root) {
       activeApkId: lib.activeApkId || "",
       videos: lib.videos || [],
       nextIndex: lib.nextIndex || 0,
+      nextApkIndex: lib.nextApkIndex || 0,
     };
     fs.writeFileSync(file, JSON.stringify(clean, null, 2) + "\n");
   }
@@ -65,6 +67,7 @@ export function libraryApi(root) {
       apk: activeApk(lib),
       videos: lib.videos || [],
       nextIndex: lib.nextIndex || 0,
+      nextApkIndex: lib.nextApkIndex || 0,
     };
   }
 
@@ -121,8 +124,10 @@ export function libraryApi(root) {
     return clean.toLowerCase().endsWith(".apk") ? clean : clean + ".apk";
   }
 
-  function sendApkFile(res) {
-    const apk = activeApk(readLib());
+  function sendApkFile(req, res) {
+    const lib = readLib();
+    const id = new URL(req.url, "http://local").searchParams.get("id");
+    const apk = id ? (lib.apks || []).find((item) => item.id === id) : activeApk(lib);
     if (!apk || apk.type !== "file" || !apk.url) {
       res.statusCode = 404;
       res.end("No APK uploaded");
@@ -148,12 +153,31 @@ export function libraryApi(root) {
     configureServer(server) {
       server.middlewares.use((req, res, next) => {
         const pathOnly = (req.url || "").split("?")[0];
-        if (pathOnly !== "/api/library" && pathOnly !== "/api/play" && pathOnly !== "/api/upload" && pathOnly !== "/api/library/apk" && pathOnly !== "/api/library/videos" && pathOnly !== "/api/library/reset" && pathOnly !== "/api/apk-file") {
+        if (pathOnly !== "/api/library" && pathOnly !== "/api/play" && pathOnly !== "/api/apk-next" && pathOnly !== "/api/upload" && pathOnly !== "/api/library/apk" && pathOnly !== "/api/library/videos" && pathOnly !== "/api/library/reset" && pathOnly !== "/api/apk-file") {
           return next();
         }
 
         if (req.method === "GET" && pathOnly === "/api/apk-file") {
-          sendApkFile(res);
+          sendApkFile(req, res);
+          return;
+        }
+
+        if (req.method === "POST" && pathOnly === "/api/apk-next") {
+          mutate((current) => {
+            const apks = current.apks || [];
+            const total = apks.length;
+            let start = 0;
+            if (total > 1) {
+              start = ((Number(current.nextApkIndex) % total) + total) % total;
+              current.nextApkIndex = (start + 1) % total;
+            } else {
+              current.nextApkIndex = 0;
+            }
+            return {
+              lib: current,
+              extra: { start, total, apk: total ? apks[start] : null },
+            };
+          }).then((result) => send(res, 200, result.extra));
           return;
         }
 

@@ -53,8 +53,9 @@
   .back:hover{color:#fff}
   .check{display:flex;align-items:center;gap:10px;margin:0 0 12px;color:#fff;font-size:14px;font-weight:600}
   .check input{width:18px;height:18px;accent-color:#ff1744}
-  video.preview{width:100%;aspect-ratio:16/9;border-radius:12px;background:#0e1013;
+  video.preview,iframe.preview{width:100%;aspect-ratio:16/9;border-radius:12px;background:#0e1013;
     margin-bottom:12px;border:1px solid rgba(255,70,90,.35)}
+  .acts{display:flex;gap:6px;flex:none;align-items:center}
   .stamp{font-size:12px;color:#c9a3ad;margin:0 0 16px}
   .identity{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:4px}
   .kicker{margin:0 0 4px;font-size:11px;font-weight:800;letter-spacing:1.8px;color:#ff8fa3}
@@ -102,7 +103,7 @@
         <h1>Admin</h1>
       </div>
     </div>
-    <div class="sub">Manage the APK, the video playlist, and the words on the page. Customers see the next video each time they open the page, and another video each time they tap the player.</div>
+    <div class="sub">Manage the APK, the video playlist, and the words on the page. Each refresh plays the next video and offers the next APK.</div>
     <div class="stamp" id="stamp">Last saved: never</div>
 
     <nav class="nav" aria-label="Admin sections">
@@ -114,7 +115,7 @@
 
     <div class="card" data-panel="apk">
       <h2>1 · APK DOWNLOAD</h2>
-      <p class="hint">Add more than one APK. Choosing files uploads them right away. Delete sits on the same row. Customers download the latest file, under that file's own name.</p>
+      <p class="hint">Add as many APKs as you want. Choosing files uploads them right away. Each refresh of the page offers the next APK, and an uploaded file keeps its own name.</p>
       <div class="block">
         <h3 class="block-title">SAVED APKS</h3>
         <div id="apkList" class="plist"></div>
@@ -145,11 +146,12 @@
 
     <div class="card" data-panel="videos" hidden>
       <h2>2 · VIDEOS</h2>
-      <p class="hint">Add a link, upload a file, or both. Each new visit starts on the next video. A tap on the player starts the one after that.</p>
+      <p class="hint">Upload mp4 or webm files, or paste a direct video link. You can add more than one. Each refresh plays the next video. An uploaded file plays with no ads. View opens the preview.</p>
       <div class="block">
         <h3 class="block-title">PLAYLIST</h3>
         <div id="videoList" class="plist"></div>
         <p class="empty" id="videoEmpty">No videos yet. The page keeps its built-in preview until you add one.</p>
+        <iframe class="preview" id="vidFrame" title="Video preview" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen hidden></iframe>
         <video class="preview" id="vidPreview" controls playsinline muted hidden></video>
       </div>
       <div class="choice">
@@ -161,62 +163,75 @@
         </div>
         <div class="block">
           <h3 class="block-title">UPLOAD</h3>
-          <label>VIDEO FILE</label>
-          <input type="file" id="videoFile" accept="video/mp4,video/webm,video/ogg,.mp4,.webm,.ogg,.mov,.m4v">
-          <button class="btn" id="uploadVid">Upload Video</button>
+          <label>VIDEO FILES</label>
+          <input type="file" id="videoFile" accept="video/mp4,video/webm,video/ogg,.mp4,.webm,.ogg,.mov,.m4v" multiple>
+          <button class="btn" id="uploadVid">Upload Videos</button>
         </div>
       </div>
     </div>
 
     <div class="card" data-panel="words" hidden>
       <h2>3 · PAGE TEXT</h2>
-      <p class="hint">Each box already shows the words on the page. Edit a section and save. Clear a box and save to restore the original line.</p>
+      <p class="hint">Open one section at a time. Each section has its own Save. The boxes already show the words on the page.</p>
+      <nav class="nav" aria-label="Page text sections">
+        <button type="button" data-words="logo" class="is-on">Logo</button>
+        <button type="button" data-words="subtitle">Subtitle</button>
+        <button type="button" data-words="video">Video</button>
+        <button type="button" data-words="button">Button</button>
+        <button type="button" data-words="info">Info card</button>
+        <button type="button" data-words="footer">Footer</button>
+      </nav>
 
-      <div class="block">
+      <div class="block" data-words-panel="logo">
         <h3 class="block-title">LOGO</h3>
         <label>FIRST WORD</label>
         <input type="text" id="logoName" placeholder="Video">
         <label>SECOND WORD</label>
         <input type="text" id="logoAccent" placeholder="App">
+        <button class="btn" type="button" data-save="logoName,logoAccent">Save logo</button>
       </div>
 
-      <div class="block">
+      <div class="block" data-words-panel="subtitle" hidden>
         <h3 class="block-title">SUBTITLE</h3>
         <label>LINE UNDER THE LOGO</label>
         <input type="text" id="subtitle" placeholder="Watch the preview & download the app">
+        <button class="btn" type="button" data-save="subtitle">Save subtitle</button>
       </div>
 
-      <div class="block">
+      <div class="block" data-words-panel="video" hidden>
         <h3 class="block-title">VIDEO</h3>
         <label>SHORT LINE</label>
         <input type="text" id="hotLabel" placeholder="HOT 🔥">
         <label>MAIN LINE</label>
         <input type="text" id="watchLine" placeholder="Download APK to watch FULL video">
+        <button class="btn" type="button" data-save="hotLabel,watchLine">Save video text</button>
       </div>
 
-      <div class="block">
+      <div class="block" data-words-panel="button" hidden>
         <h3 class="block-title">DOWNLOAD BUTTON</h3>
         <label>BUTTON</label>
         <input type="text" id="dlMain" placeholder="DOWNLOAD APK 🔥">
         <label>SMALL LINE UNDER THE BUTTON</label>
         <input type="text" id="dlSmall" placeholder="Tap here to download 👇">
+        <button class="btn" type="button" data-save="dlMain,dlSmall">Save button text</button>
       </div>
 
-      <div class="block">
+      <div class="block" data-words-panel="info" hidden>
         <h3 class="block-title">INFO CARD</h3>
         <label>TITLE</label>
         <input type="text" id="infoTitle" placeholder="40,000+ Hot Videos">
         <label>TEXT</label>
         <textarea id="infoText" placeholder="Download the app to unlock the full collection — no ads."></textarea>
+        <button class="btn" type="button" data-save="infoTitle,infoText">Save info card</button>
       </div>
 
-      <div class="block">
+      <div class="block" data-words-panel="footer" hidden>
         <h3 class="block-title">FOOTER</h3>
         <label>FOOTER LINE</label>
         <input type="text" id="footText" placeholder="VideoApp · 18+ only">
         <label class="check"><input type="checkbox" id="show18" checked> Show 18+ badges on the logo and footer</label>
+        <button class="btn" type="button" data-save="footText" data-save-18="1">Save footer</button>
       </div>
-      <button class="btn" id="saveText">Save Page Text</button>
     </div>
 
     <div class="card" data-panel="security" hidden>
@@ -266,6 +281,50 @@
   var gateErr = document.getElementById("gateErr");
   var msg = document.getElementById("msg");
   var preview = document.getElementById("vidPreview");
+  var frame = document.getElementById("vidFrame");
+  var viewingId = "";
+
+  function youtubeId(url) {
+    try {
+      var parsed = new URL(url);
+      var host = parsed.hostname.replace(/^www\./, "");
+      if (host === "youtu.be") return parsed.pathname.split("/").filter(Boolean)[0] || "";
+      if (host === "youtube.com" || host === "m.youtube.com" || host === "youtube-nocookie.com") {
+        if (parsed.searchParams.get("v")) return parsed.searchParams.get("v");
+        var parts = parsed.pathname.split("/").filter(Boolean);
+        if (parts[0] === "embed" || parts[0] === "shorts" || parts[0] === "live") return parts[1] || "";
+      }
+    } catch (e) {}
+    return "";
+  }
+
+  function hidePreview() {
+    viewingId = "";
+    preview.pause();
+    preview.hidden = true;
+    preview.removeAttribute("src");
+    frame.hidden = true;
+    frame.removeAttribute("src");
+  }
+
+  function showVideo(item) {
+    viewingId = item.id;
+    var id = youtubeId(item.url);
+    if (id) {
+      preview.pause();
+      preview.hidden = true;
+      preview.removeAttribute("src");
+      frame.hidden = false;
+      frame.setAttribute("src", "https://www.youtube-nocookie.com/embed/" + id + "?autoplay=1&mute=1&playsinline=1&rel=0&modestbranding=1");
+      return;
+    }
+    frame.hidden = true;
+    frame.removeAttribute("src");
+    preview.hidden = false;
+    preview.muted = true;
+    preview.setAttribute("src", item.url);
+    preview.play().catch(function () {});
+  }
 
   function store(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
   function read(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
@@ -299,9 +358,7 @@
       name.textContent = (index + 1) + ". " + (item.name || item.url);
       var kind = document.createElement("div");
       kind.className = "kind";
-      var label = item.type === "file" ? "Uploaded file" : "Link";
-      if (item.id === activeId) label += " · on the download button";
-      kind.textContent = label;
+      kind.textContent = item.type === "file" ? "Uploaded file" : "Link";
       var button = document.createElement("button");
       button.className = "btn mini danger";
       button.type = "button";
@@ -330,26 +387,28 @@
       var kind = document.createElement("div");
       kind.className = "kind";
       kind.textContent = item.type === "file" ? "Uploaded file" : "Link";
-      var button = document.createElement("button");
-      button.className = "btn mini";
-      button.type = "button";
-      button.textContent = "Remove";
-      button.onclick = function () { removeVideo(item.id); };
+      var acts = document.createElement("div");
+      acts.className = "acts";
+      var viewBtn = document.createElement("button");
+      viewBtn.className = "btn mini";
+      viewBtn.type = "button";
+      viewBtn.textContent = "View";
+      viewBtn.onclick = function () { showVideo(item); };
+      var delBtn = document.createElement("button");
+      delBtn.className = "btn mini danger";
+      delBtn.type = "button";
+      delBtn.textContent = "Delete";
+      delBtn.onclick = function () { removeVideo(item.id); };
+      acts.appendChild(viewBtn);
+      acts.appendChild(delBtn);
       meta.appendChild(name);
       meta.appendChild(kind);
       row.appendChild(meta);
-      row.appendChild(button);
+      row.appendChild(acts);
       list.appendChild(row);
     });
 
-    if (videos.length) {
-      var src = videos[0].url;
-      if (preview.getAttribute("src") !== src) preview.setAttribute("src", src);
-      preview.hidden = false;
-    } else {
-      preview.removeAttribute("src");
-      preview.hidden = true;
-    }
+    if (viewingId && !videos.some(function (item) { return item.id === viewingId; })) hidePreview();
   }
 
   function loadLibrary() {
@@ -390,7 +449,7 @@
         stamp();
         if (failed) say(failed + " of " + list.length + " APK files could not be uploaded.", false);
         else if (list.length === 1) say("APK uploaded. Customers download it as " + (list[0].name || "that file") + ".", true);
-        else say(list.length + " APKs uploaded. The latest one is on the download button.", true);
+        else say(list.length + " APKs uploaded. Each page refresh offers the next one.", true);
         return;
       }
       var file = list[index];
@@ -436,7 +495,7 @@
         document.getElementById("newApk").value = "";
         paintLibrary(res.body);
         stamp();
-        say("APK link added. It is now on the download button.", true);
+        say("APK link added. Each page refresh offers the next APK.", true);
       })
       .catch(function () { say("Could not save the APK link.", false); });
   };
@@ -467,21 +526,43 @@
       .catch(function () { say("Could not add that video.", false); });
   };
 
-  document.getElementById("uploadVid").onclick = function () {
-    var file = document.getElementById("videoFile").files[0];
-    if (!file) { say("Choose a video file first.", false); return; }
-    var data = new FormData();
-    data.append("file", file);
-    fetch("/api/upload?kind=video", { method: "POST", body: data })
-      .then(function (r) { return r.json().then(function (body) { return { ok: r.ok, body: body }; }); })
-      .then(function (res) {
-        if (!res.ok) { say(res.body.error || "Upload failed.", false); return; }
+  var videoUploading = false;
+  function uploadVideoFiles(files) {
+    var list = Array.prototype.slice.call(files || []).filter(Boolean);
+    if (!list.length) { say("Choose a video file first.", false); return; }
+    if (videoUploading) return;
+    videoUploading = true;
+    var index = 0;
+    var failed = 0;
+    function next() {
+      if (index >= list.length) {
+        videoUploading = false;
         document.getElementById("videoFile").value = "";
-        paintLibrary(res.body);
+        loadLibrary();
         stamp();
-        say("Video uploaded and added to the list.", true);
-      })
-      .catch(function () { say("Upload failed.", false); });
+        if (failed) say(failed + " of " + list.length + " videos could not be uploaded.", false);
+        else if (list.length === 1) say("Video uploaded. An uploaded file plays on the page with no ads.", true);
+        else say(list.length + " videos uploaded. Each refresh plays the next one. Uploaded files have no ads.", true);
+        return;
+      }
+      var file = list[index];
+      index += 1;
+      var data = new FormData();
+      data.append("file", file);
+      fetch("/api/upload?kind=video", { method: "POST", body: data })
+        .then(function (r) { return r.json().then(function (body) { return { ok: r.ok, body: body }; }); })
+        .then(function (res) { if (!res.ok) failed += 1; })
+        .catch(function () { failed += 1; })
+        .finally(next);
+    }
+    next();
+  }
+
+  document.getElementById("videoFile").addEventListener("change", function () {
+    if (this.files && this.files.length) uploadVideoFiles(this.files);
+  });
+  document.getElementById("uploadVid").onclick = function () {
+    uploadVideoFiles(document.getElementById("videoFile").files);
   };
 
   function fillText() {
@@ -524,18 +605,33 @@
       .catch(function () { say("Could not save the download count.", false); });
   };
 
-  document.getElementById("saveText").onclick = function () {
-    TEXT_IDS.forEach(function (id) {
-      var v = document.getElementById(id).value.trim();
-      if (!v || v === PAGE_WORDS[id]) del(id);
-      else store(id, v);
-    });
-    if (document.getElementById("show18").checked) del("show_18");
-    else store("show_18", "0");
-    stamp();
-    fillText();
-    say("Page text saved. Refresh the landing page.", true);
-  };
+  document.querySelectorAll("[data-words]").forEach(function (btn) {
+    btn.onclick = function () {
+      var name = btn.getAttribute("data-words");
+      document.querySelectorAll("[data-words]").forEach(function (item) {
+        item.classList.toggle("is-on", item === btn);
+      });
+      document.querySelectorAll("[data-words-panel]").forEach(function (panelEl) {
+        panelEl.hidden = panelEl.getAttribute("data-words-panel") !== name;
+      });
+    };
+  });
+
+  document.querySelectorAll("[data-save]").forEach(function (btn) {
+    btn.onclick = function () {
+      btn.getAttribute("data-save").split(",").forEach(function (id) {
+        var v = document.getElementById(id).value.trim();
+        if (!v || v === PAGE_WORDS[id]) del(id);
+        else store(id, v);
+      });
+      if (btn.getAttribute("data-save-18") === "1") {
+        if (document.getElementById("show18").checked) del("show_18");
+        else store("show_18", "0");
+      }
+      stamp();
+      say("Saved. Refresh the landing page to see this section.", true);
+    };
+  });
 
   document.getElementById("savePass").onclick = function () {
     var oldP = document.getElementById("oldPass").value;
