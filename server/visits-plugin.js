@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
+import QRCode from "qrcode";
 
 const DEFAULT_PASS = "Test123";
 const MAX_BODY = 24 * 1024;
@@ -18,6 +19,69 @@ function num(value, max) {
 
 function flag(value) {
   return value === true || value === 1 || value === "true";
+}
+
+const B32 = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+
+function base32Encode(buf) {
+  let bits = 0;
+  let value = 0;
+  let out = "";
+  for (const byte of buf) {
+    value = (value << 8) | byte;
+    bits += 8;
+    while (bits >= 5) {
+      out += B32[(value >>> (bits - 5)) & 31];
+      bits -= 5;
+    }
+  }
+  if (bits > 0) out += B32[(value << (5 - bits)) & 31];
+  return out;
+}
+
+function base32Decode(str) {
+  const clean = String(str || "").toUpperCase().replace(/=+$/g, "").replace(/[^A-Z2-7]/g, "");
+  let bits = 0;
+  let value = 0;
+  const out = [];
+  for (const ch of clean) {
+    const idx = B32.indexOf(ch);
+    if (idx < 0) continue;
+    value = (value << 5) | idx;
+    bits += 5;
+    if (bits >= 8) {
+      out.push((value >>> (bits - 8)) & 255);
+      bits -= 8;
+    }
+  }
+  return Buffer.from(out);
+}
+
+function hotp(secret, counter) {
+  const buf = Buffer.alloc(8);
+  let n = counter;
+  for (let i = 7; i >= 0; i--) {
+    buf[i] = n & 0xff;
+    n = Math.floor(n / 256);
+  }
+  const hmac = crypto.createHmac("sha1", secret).update(buf).digest();
+  const offset = hmac[hmac.length - 1] & 0x0f;
+  const bin = ((hmac[offset] & 0x7f) << 24) | (hmac[offset + 1] << 16) | (hmac[offset + 2] << 8) | hmac[offset + 3];
+  return String(bin % 1000000).padStart(6, "0");
+}
+
+function totpOk(secretB32, code) {
+  const token = String(code || "").replace(/\s/g, "");
+  if (!/^\d{6}$/.test(token)) return false;
+  const secret = base32Decode(secretB32);
+  if (secret.length < 10) return false;
+  const step = Math.floor(Date.now() / 30000);
+  const given = Buffer.from(token);
+  for (let i = -1; i <= 1; i++) {
+    const expect = Buffer.from(hotp(secret, step + i));
+    if (expect.length === given.length && crypto.timingSafeEqual(expect, given)) return true;
+  }
+  return false;
 }
 
 function privateIp(ip) {
@@ -117,11 +181,92 @@ export function visitsApi(root) {
     return crypto.timingSafeEqual(actual, stored);
   }
 
+  const sessions = new Map();
+
+  function issueSession() {
+    const token = crypto.randomBytes(24).toString("hex");
+    sessions.set(token, Date.now() + 12 * 60 * 60 * 1000);
+    return token;
+  }
+
+  function sessionOk(token) {
+    const key = String(token || "");
+    const expires = sessions.get(key);
+    if (!expires) return false;
+    if (Date.now() > expires) {
+      sessions.delete(key);
+      return false;
+    }
+    return true;
+  }
+
+  function authorized(req) {
+    return passwordOk(req.headers["x-admin-key"]) || sessionOk(req.headers["x-admin-session"]);
+  }
+
+  function readGoogle() {
+    const auth = readAuth();
+    return {
+      clientId: clip(auth.googleClientId, 200),
+      email: clip(auth.googleEmail, 120).toLowerCase(),
+    };
+  }
+
+  function saveGoogle(clientId, email) {
+    const auth = readAuth();
+    auth.googleClientId = clip(clientId, 200);
+    auth.googleEmail = clip(email, 120).toLowerCase();
+    ensureDir();
+    fs.writeFileSync(authFile, JSON.stringify(auth));
+    try { fs.chmodSync(authFile, 0o600); } catch (e) {}
+  }
+
+  function readOtp() {
+    const auth = readAuth();
+    let secret = "";
+    let pending = "";
+    try { if (auth.otpSecret) secret = String(decrypt(auth.otpSecret).secret || ""); } catch (e) {}
+    try { if (auth.otpPending) pending = String(decrypt(auth.otpPending).secret || ""); } catch (e) {}
+    return { enabled: auth.otpEnabled === true && !!secret, secret, pending };
+  }
+
+  function writeOtp(patch) {
+    const auth = readAuth();
+    if (Object.prototype.hasOwnProperty.call(patch, "enabled")) auth.otpEnabled = patch.enabled === true;
+    if (Object.prototype.hasOwnProperty.call(patch, "secret")) auth.otpSecret = patch.secret ? encrypt({ secret: patch.secret }) : "";
+    if (Object.prototype.hasOwnProperty.call(patch, "pending")) auth.otpPending = patch.pending ? encrypt({ secret: patch.pending }) : "";
+    ensureDir();
+    fs.writeFileSync(authFile, JSON.stringify(auth));
+    try { fs.chmodSync(authFile, 0o600); } catch (e) {}
+  }
+
+  function otpGate(body) {
+    const otp = readOtp();
+    if (!otp.enabled) return null;
+    const code = String((body && body.otp) || "").replace(/\s/g, "");
+    if (!/^\d{6}$/.test(code)) {
+      return { needsOtp: true, error: "Enter the 6-digit code from Google Authenticator." };
+    }
+    if (!totpOk(otp.secret, code)) {
+      return { needsOtp: true, error: "That Authenticator code is wrong." };
+    }
+    return null;
+  }
+
   function setPassword(password) {
+    const prev = readAuth();
     const salt = crypto.randomBytes(16).toString("hex");
     const hash = crypto.scryptSync(password, Buffer.from(salt, "hex"), 32).toString("hex");
     ensureDir();
-    fs.writeFileSync(authFile, JSON.stringify({ salt, hash }));
+    fs.writeFileSync(authFile, JSON.stringify({
+      salt,
+      hash,
+      googleClientId: prev.googleClientId || "",
+      googleEmail: prev.googleEmail || "",
+      otpEnabled: prev.otpEnabled === true,
+      otpSecret: prev.otpSecret || "",
+      otpPending: prev.otpPending || "",
+    }));
     try { fs.chmodSync(authFile, 0o600); } catch (e) {}
   }
 
@@ -342,7 +487,8 @@ export function visitsApi(root) {
     configureServer(server) {
       server.middlewares.use((req, res, next) => {
         const pathOnly = (req.url || "").split("?")[0];
-        if (pathOnly !== "/api/visit" && pathOnly !== "/api/visits" && pathOnly !== "/api/admin-pass") return next();
+        const otpPath = pathOnly === "/api/otp-status" || pathOnly === "/api/otp/setup" || pathOnly === "/api/otp/confirm" || pathOnly === "/api/otp/disable";
+        if (pathOnly !== "/api/visit" && pathOnly !== "/api/visits" && pathOnly !== "/api/admin-pass" && pathOnly !== "/api/login" && pathOnly !== "/api/google-config" && pathOnly !== "/api/google-login" && !otpPath) return next();
 
         if (req.method === "POST" && pathOnly === "/api/visit") {
           readBody(req)
@@ -372,8 +518,148 @@ export function visitsApi(root) {
           return;
         }
 
+        if (req.method === "POST" && pathOnly === "/api/login") {
+          readBody(req)
+            .then((body) => {
+              if (!passwordOk(body.password)) {
+                send(res, 401, { error: "Wrong password." });
+                return;
+              }
+              const blocked = otpGate(body);
+              if (blocked) {
+                send(res, 401, blocked);
+                return;
+              }
+              send(res, 200, { session: issueSession() });
+            })
+            .catch(() => send(res, 400, { error: "Could not sign in." }));
+          return;
+        }
+
+        if (req.method === "GET" && pathOnly === "/api/otp-status") {
+          send(res, 200, { enabled: readOtp().enabled });
+          return;
+        }
+
+        if (req.method === "POST" && pathOnly === "/api/otp/setup") {
+          if (!authorized(req)) {
+            send(res, 401, { error: "Wrong password." });
+            return;
+          }
+          const secret = base32Encode(crypto.randomBytes(20));
+          const uri = "otpauth://totp/" + encodeURIComponent("VideoApp Admin") + "?secret=" + secret + "&issuer=" + encodeURIComponent("VideoApp") + "&digits=6&period=30";
+          writeOtp({ pending: secret });
+          QRCode.toDataURL(uri, { margin: 1, width: 240, errorCorrectionLevel: "M" })
+            .then((qr) => send(res, 200, { secret, uri, qr }))
+            .catch(() => send(res, 200, { secret, uri, qr: "" }));
+          return;
+        }
+
+        if (req.method === "POST" && pathOnly === "/api/otp/confirm") {
+          if (!authorized(req)) {
+            send(res, 401, { error: "Wrong password." });
+            return;
+          }
+          readBody(req)
+            .then((body) => {
+              const otp = readOtp();
+              if (!otp.pending) {
+                send(res, 400, { error: "Set up Authenticator first." });
+                return;
+              }
+              if (!totpOk(otp.pending, body.code)) {
+                send(res, 401, { error: "That code does not match. Check the time on your phone and try the new code." });
+                return;
+              }
+              writeOtp({ enabled: true, secret: otp.pending, pending: "" });
+              send(res, 200, { enabled: true });
+            })
+            .catch(() => send(res, 400, { error: "Could not turn on Authenticator." }));
+          return;
+        }
+
+        if (req.method === "POST" && pathOnly === "/api/otp/disable") {
+          if (!authorized(req)) {
+            send(res, 401, { error: "Wrong password." });
+            return;
+          }
+          readBody(req)
+            .then((body) => {
+              const otp = readOtp();
+              if (otp.enabled && !totpOk(otp.secret, body.code)) {
+                send(res, 401, { error: "That Authenticator code is wrong." });
+                return;
+              }
+              writeOtp({ enabled: false, secret: "", pending: "" });
+              send(res, 200, { enabled: false });
+            })
+            .catch(() => send(res, 400, { error: "Could not turn off Authenticator." }));
+          return;
+        }
+
+        if (req.method === "GET" && pathOnly === "/api/google-config") {
+          const google = readGoogle();
+          if (authorized(req)) send(res, 200, google);
+          else send(res, 200, { clientId: google.clientId });
+          return;
+        }
+
+        if (req.method === "POST" && pathOnly === "/api/google-config") {
+          if (!authorized(req)) {
+            send(res, 401, { error: "Wrong password." });
+            return;
+          }
+          readBody(req)
+            .then((body) => {
+              const clientId = clip(body.clientId, 200);
+              const email = clip(body.email, 120).toLowerCase();
+              if (clientId && !clientId.endsWith(".apps.googleusercontent.com")) {
+                send(res, 400, { error: "Paste the Web client ID from Google Cloud." });
+                return;
+              }
+              if (email && !email.includes("@")) {
+                send(res, 400, { error: "Enter the Gmail address that may open admin." });
+                return;
+              }
+              saveGoogle(clientId, email);
+              send(res, 200, { clientId, email });
+            })
+            .catch(() => send(res, 400, { error: "Could not save Google sign-in." }));
+          return;
+        }
+
+        if (req.method === "POST" && pathOnly === "/api/google-login") {
+          readBody(req)
+            .then(async (body) => {
+              const blocked = otpGate(body);
+              if (blocked) {
+                send(res, 401, blocked);
+                return;
+              }
+              const google = readGoogle();
+              if (!google.clientId || !google.email) {
+                send(res, 400, { error: "Save a Google Client ID and Gmail in the Password section first." });
+                return;
+              }
+              const credential = String(body.credential || "");
+              if (!credential || credential.length > 4000) {
+                send(res, 401, { error: "Google sign-in failed." });
+                return;
+              }
+              const info = await fetchJson("https://oauth2.googleapis.com/tokeninfo?id_token=" + encodeURIComponent(credential));
+              const verified = info && (info.email_verified === true || info.email_verified === "true");
+              if (!info || info.aud !== google.clientId || !verified || clip(info.email, 120).toLowerCase() !== google.email) {
+                send(res, 401, { error: "This Google account cannot open the admin." });
+                return;
+              }
+              send(res, 200, { session: issueSession(), email: google.email });
+            })
+            .catch(() => send(res, 401, { error: "Google sign-in failed." }));
+          return;
+        }
+
         if (req.method === "GET" && pathOnly === "/api/visits") {
-          if (!passwordOk(req.headers["x-admin-key"])) {
+          if (!authorized(req)) {
             send(res, 401, { error: "Wrong password." });
             return;
           }
@@ -383,7 +669,7 @@ export function visitsApi(root) {
         }
 
         if (req.method === "DELETE" && pathOnly === "/api/visits") {
-          if (!passwordOk(req.headers["x-admin-key"])) {
+          if (!authorized(req)) {
             send(res, 401, { error: "Wrong password." });
             return;
           }

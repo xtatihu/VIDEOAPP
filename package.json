@@ -12,6 +12,7 @@
     "vite": "^8.3.0"
   },
   "dependencies": {
-    "busboy": "^1.6.0"
+    "busboy": "^1.6.0",
+    "qrcode": "^1.5.4"
   }
 }

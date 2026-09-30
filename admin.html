@@ -80,6 +80,13 @@
   .vrow{display:grid;grid-template-columns:minmax(118px,38%) 1fr;gap:2px 8px;font-size:12px;line-height:1.45;word-break:break-word}
   .vlive{color:#4ade80;font-weight:800}
   .vk{color:#c9a3ad}
+  .or{text-align:center;color:#c9a3ad;font-size:12px;margin:10px 0 8px}
+  #googleBtn{display:flex;justify-content:center;min-height:44px}
+  #googleHint{margin-top:8px}
+  #otpQr{display:block;width:220px;height:220px;margin:0 auto 12px;border-radius:12px;background:#fff;padding:8px}
+  input[type=email]{width:100%;padding:12px 13px;border-radius:12px;margin-bottom:12px;
+    border:1px solid rgba(255,255,255,.14);background:#16080c;color:#fff;
+    font-size:14px;font-family:inherit;outline:none}
   input[type=file]{width:100%;margin-bottom:12px;font-size:13px;color:#f3d5dc}
   .choice{display:grid;grid-template-columns:1fr 1fr;gap:12px}
   .choice h3{margin:0 0 8px;font-size:12px;letter-spacing:1px;color:#fff}
@@ -105,8 +112,14 @@
     <div class="sub">VideoApp settings · password gate</div>
     <label>PASSWORD</label>
     <input type="password" id="pw" placeholder="Enter admin password" autocomplete="off">
+    <label id="otpLabel" for="otp" hidden>AUTHENTICATOR CODE</label>
+    <input type="text" id="otp" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="6-digit code" hidden>
+    <p class="hint" id="otpGateHint" hidden>Google Authenticator is on. Type the current 6-digit code, then unlock.</p>
     <div class="err" id="gateErr"></div>
     <button class="btn" id="loginBtn">Unlock</button>
+    <div class="or">or</div>
+    <div id="googleBtn"></div>
+    <p class="hint" id="googleHint">Google sign-in turns on after a Client ID and Gmail are saved in Password.</p>
   </div>
 
   <div id="panel" hidden>
@@ -258,9 +271,12 @@
 
     <div class="card" data-panel="visitors" hidden>
       <h2>4 · VISITORS</h2>
-      <p class="hint">Each row shows the date, IP, location, device, time on the page, and which landing button they tapped. View opens the rest. The saved file is encrypted.</p>
+      <p class="hint">Each row shows the date, IP, location, device, time on the page, and which landing button they tapped. View opens the rest. Search matches any of those details. The saved file is encrypted.</p>
+      <label for="visitSearch">SEARCH</label>
+      <input type="text" id="visitSearch" placeholder="IP, city, device, button, date" autocomplete="off">
       <div id="visitList" class="plist"></div>
       <p class="empty" id="visitEmpty">No visits yet. Open the landing page and this list will fill in.</p>
+      <p class="empty" id="visitNone" hidden>No visit matches that search.</p>
       <div class="row">
         <button class="btn ghost" id="reloadVisits" type="button">Refresh</button>
         <button class="btn danger" id="clearVisits" type="button">Clear visits</button>
@@ -278,6 +294,37 @@
         <label>CONFIRM NEW PASSWORD</label>
         <input type="password" id="confirmPass" autocomplete="new-password">
         <button class="btn" id="savePass">Update Password</button>
+      </div>
+      <div class="block">
+        <h3 class="block-title">GOOGLE AUTHENTICATOR</h3>
+        <p class="hint" id="otpState">Off. Password alone opens admin.</p>
+        <div id="otpSetup" hidden>
+          <img id="otpQr" alt="Scan this QR in Google Authenticator" width="220" height="220">
+          <label for="otpSecret">MANUAL KEY</label>
+          <input type="text" id="otpSecret" readonly autocomplete="off">
+          <label for="otpConfirm">CODE FROM THE APP</label>
+          <input type="text" id="otpConfirm" inputmode="numeric" maxlength="6" placeholder="6-digit code" autocomplete="one-time-code">
+          <button class="btn" id="confirmOtp" type="button">Turn on Authenticator</button>
+        </div>
+        <div id="otpOffBox" hidden>
+          <label for="otpDisableCode">CURRENT CODE</label>
+          <input type="text" id="otpDisableCode" inputmode="numeric" maxlength="6" placeholder="6-digit code" autocomplete="one-time-code">
+          <button class="btn danger" id="confirmDisable" type="button">Confirm turn off</button>
+        </div>
+        <div class="row">
+          <button class="btn" id="startOtp" type="button">Set up Authenticator</button>
+          <button class="btn ghost" id="disableOtp" type="button" hidden>Turn off</button>
+        </div>
+        <p class="hint">Scan the QR with Google Authenticator. While this is on, login needs the password and the 6-digit code. Turn it off here with a current code. Changing the password does not turn this off.</p>
+      </div>
+      <div class="block">
+        <h3 class="block-title">GOOGLE SIGN-IN</h3>
+        <label>GOOGLE CLIENT ID</label>
+        <input type="text" id="googleClient" placeholder="xxxx.apps.googleusercontent.com" autocomplete="off">
+        <label>ALLOWED GMAIL</label>
+        <input type="email" id="googleEmail" placeholder="you@gmail.com" autocomplete="off">
+        <p class="hint">Optional. In Google Cloud, create a Web client and add this site under Authorized JavaScript origins. If Authenticator is on, Google sign-in also asks for the 6-digit code.</p>
+        <button class="btn" id="saveGoogle" type="button">Save Google sign-in</button>
       </div>
     </div>
 
@@ -409,6 +456,20 @@
   function read(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
   function del(k) { try { localStorage.removeItem(k); } catch (e) {} }
   function pass() { return read("admin_pass") || DEFAULT_PASS; }
+  function authHeaders() {
+    var headers = { "x-admin-key": pass() };
+    var session = read("admin_session");
+    if (session) headers["x-admin-session"] = session;
+    return headers;
+  }
+  function openPanel() {
+    gate.hidden = true;
+    panel.hidden = false;
+    gateErr.textContent = "";
+    pw.value = "";
+    refreshAll();
+    store("admin_unlocked", "1");
+  }
   function say(t, ok) { msg.style.color = ok ? "#4ade80" : "#ff8fa3"; msg.textContent = t; }
   function stamp() {
     store("admin_saved_at", String(Date.now()));
@@ -729,7 +790,8 @@
     var list = document.getElementById("visitList");
     var empty = document.getElementById("visitEmpty");
     list.innerHTML = "";
-    empty.hidden = visits.length > 0;
+    empty.hidden = true;
+    document.getElementById("visitNone").hidden = true;
     visits.forEach(function (visit, index) {
       var card = document.createElement("article");
       card.className = "vcard";
@@ -818,12 +880,25 @@
     });
   }
 
+  var visitorRows = [];
+
+  function applyVisitSearch() {
+    var q = document.getElementById("visitSearch").value.trim().toLowerCase();
+    var rows = !q ? visitorRows : visitorRows.filter(function (visit) {
+      return JSON.stringify(visit).toLowerCase().indexOf(q) >= 0;
+    });
+    paintVisits(rows);
+    document.getElementById("visitEmpty").hidden = visitorRows.length > 0;
+    document.getElementById("visitNone").hidden = !(visitorRows.length && rows.length === 0);
+  }
+
   function loadVisits() {
-    return fetch("/api/visits", { headers: { "x-admin-key": pass() }, cache: "no-store" })
+    return fetch("/api/visits", { headers: authHeaders(), cache: "no-store" })
       .then(function (r) { return r.json().then(function (body) { return { ok: r.ok, body: body }; }); })
       .then(function (res) {
         if (!res.ok) { say(res.body.error || "Could not open the visitor list.", false); return; }
-        paintVisits(res.body.visits || []);
+        visitorRows = res.body.visits || [];
+        applyVisitSearch();
       })
       .catch(function () { say("Could not open the visitor list.", false); });
   }
@@ -833,6 +908,7 @@
     fillText();
     paintStamp();
     loadVisits();
+    loadGoogleConfig();
   }
 
   document.getElementById("saveCount").onclick = function () {
@@ -907,17 +983,158 @@
       .catch(function () { say("Could not update the password.", false); });
   };
 
-  function unlock() {
-    if (pw.value === pass()) {
-      gate.hidden = true;
-      panel.hidden = false;
-      gateErr.textContent = "";
-      pw.value = "";
-      refreshAll();
-      store("admin_unlocked", "1");
-    } else {
-      gateErr.textContent = "Wrong password.";
+  document.getElementById("saveGoogle").onclick = function () {
+    fetch("/api/google-config", {
+      method: "POST",
+      headers: Object.assign({ "content-type": "application/json" }, authHeaders()),
+      body: JSON.stringify({
+        clientId: document.getElementById("googleClient").value.trim(),
+        email: document.getElementById("googleEmail").value.trim()
+      })
+    })
+      .then(function (r) { return r.json().then(function (body) { return { ok: r.ok, body: body }; }); })
+      .then(function (res) {
+        if (!res.ok) { say(res.body.error || "Could not save Google sign-in.", false); return; }
+        mountGoogle(res.body.clientId || "");
+        stamp();
+        say(res.body.clientId ? "Google sign-in saved for " + res.body.email + "." : "Google sign-in turned off.", true);
+      })
+      .catch(function () { say("Could not save Google sign-in.", false); });
+  };
+
+  var otpOn = false;
+
+  function otpCode() {
+    var el = document.getElementById("otp");
+    return el ? String(el.value || "").replace(/\s/g, "") : "";
+  }
+
+  function showOtpField(on) {
+    otpOn = !!on;
+    document.getElementById("otpLabel").hidden = !otpOn;
+    document.getElementById("otp").hidden = !otpOn;
+    document.getElementById("otpGateHint").hidden = !otpOn;
+  }
+
+  function paintOtp(data) {
+    showOtpField(!!(data && data.enabled));
+    var state = document.getElementById("otpState");
+    var start = document.getElementById("startOtp");
+    var disable = document.getElementById("disableOtp");
+    if (state) {
+      state.textContent = otpOn
+        ? "On. Login needs the password and the 6-digit code from Google Authenticator."
+        : "Off. Password alone opens admin. Turn this on to also ask for a code.";
     }
+    if (start) start.hidden = otpOn;
+    if (disable) disable.hidden = !otpOn;
+    if (!otpOn) {
+      document.getElementById("otpSetup").hidden = true;
+      document.getElementById("otpOffBox").hidden = true;
+    }
+  }
+
+  function loadOtpStatus(boot) {
+    return fetch("/api/otp-status", { cache: "no-store" })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        paintOtp(data);
+        if (boot && otpOn) {
+          del("admin_unlocked");
+          gate.hidden = false;
+          panel.hidden = true;
+        }
+      })
+      .catch(function () {});
+  }
+
+  function unlock() {
+    var typed = pw.value;
+    fetch("/api/login", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ password: typed, otp: otpCode() })
+    })
+      .then(function (r) { return r.json().then(function (body) { return { ok: r.ok, status: r.status, body: body }; }); })
+      .then(function (res) {
+        if (res.ok && res.body.session) {
+          store("admin_session", res.body.session);
+          if (typed === DEFAULT_PASS) del("admin_pass");
+          else store("admin_pass", typed);
+          document.getElementById("otp").value = "";
+          openPanel();
+          return;
+        }
+        if (res.body && res.body.needsOtp) {
+          showOtpField(true);
+          gateErr.textContent = res.body.error || "Enter the 6-digit Authenticator code.";
+          return;
+        }
+        gateErr.textContent = (res.body && res.body.error) || "Wrong password.";
+      })
+      .catch(function () {
+        if (!otpOn && typed && typed === pass()) openPanel();
+        else gateErr.textContent = "Wrong password.";
+      });
+  }
+
+  function googleUnlock(credential) {
+    fetch("/api/google-login", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ credential: credential, otp: otpCode() })
+    })
+      .then(function (r) { return r.json().then(function (body) { return { ok: r.ok, body: body }; }); })
+      .then(function (res) {
+        if (res.body && res.body.needsOtp) {
+          showOtpField(true);
+          gateErr.textContent = res.body.error || "Enter the 6-digit Authenticator code, then use Google again.";
+          return;
+        }
+        if (!res.ok || !res.body.session) {
+          gateErr.textContent = res.body.error || "This Google account cannot open the admin.";
+          return;
+        }
+        store("admin_session", res.body.session);
+        document.getElementById("otp").value = "";
+        openPanel();
+        say("Signed in with " + (res.body.email || "Google") + ".", true);
+      })
+      .catch(function () { gateErr.textContent = "Google sign-in failed."; });
+  }
+
+  function mountGoogle(clientId) {
+    var hint = document.getElementById("googleHint");
+    var box = document.getElementById("googleBtn");
+    if (!clientId) {
+      if (hint) hint.hidden = false;
+      return;
+    }
+    if (hint) hint.hidden = true;
+    if (window.google && google.accounts && google.accounts.id) {
+      google.accounts.id.initialize({ client_id: clientId, callback: function (res) { googleUnlock(res.credential); } });
+      box.innerHTML = "";
+      google.accounts.id.renderButton(box, { theme: "filled_black", size: "large", width: 320, text: "signin_with", shape: "pill" });
+      return;
+    }
+    var script = document.createElement("script");
+    script.src = "https://accounts.google.com/gsi/client";
+    script.async = true;
+    script.onload = function () { mountGoogle(clientId); };
+    document.head.appendChild(script);
+  }
+
+  function loadGoogleConfig() {
+    fetch("/api/google-config", { headers: authHeaders(), cache: "no-store" })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        var client = document.getElementById("googleClient");
+        var email = document.getElementById("googleEmail");
+        if (client && data.clientId) client.value = data.clientId;
+        if (email && data.email) email.value = data.email;
+        mountGoogle(data.clientId || "");
+      })
+      .catch(function () {});
   }
   document.querySelectorAll("[data-section]").forEach(function (btn) {
     btn.onclick = function () {
@@ -929,16 +1146,20 @@
         panelEl.hidden = panelEl.getAttribute("data-panel") !== name;
       });
       if (name === "visitors") loadVisits();
+      if (name === "security") loadOtpStatus(false);
     };
   });
 
+  document.getElementById("visitSearch").addEventListener("input", applyVisitSearch);
   document.getElementById("reloadVisits").onclick = function () { loadVisits(); };
   document.getElementById("clearVisits").onclick = function () {
-    fetch("/api/visits", { method: "DELETE", headers: { "x-admin-key": pass() } })
+    fetch("/api/visits", { method: "DELETE", headers: authHeaders() })
       .then(function (r) { return r.json().then(function (body) { return { ok: r.ok, body: body }; }); })
       .then(function (res) {
         if (!res.ok) { say(res.body.error || "Could not clear the visits.", false); return; }
-        paintVisits([]);
+        visitorRows = [];
+        document.getElementById("visitSearch").value = "";
+        applyVisitSearch();
         say("Visitor list cleared.", true);
       })
       .catch(function () { say("Could not clear the visits.", false); });
@@ -946,6 +1167,62 @@
 
   document.getElementById("loginBtn").onclick = unlock;
   pw.addEventListener("keydown", function (e) { if (e.key === "Enter") unlock(); });
+  document.getElementById("otp").addEventListener("keydown", function (e) { if (e.key === "Enter") unlock(); });
+
+  document.getElementById("startOtp").onclick = function () {
+    fetch("/api/otp/setup", { method: "POST", headers: authHeaders() })
+      .then(function (r) { return r.json().then(function (body) { return { ok: r.ok, body: body }; }); })
+      .then(function (res) {
+        if (!res.ok) { say(res.body.error || "Could not start Authenticator.", false); return; }
+        document.getElementById("otpSetup").hidden = false;
+        document.getElementById("otpOffBox").hidden = true;
+        document.getElementById("otpQr").src = res.body.qr || "";
+        document.getElementById("otpSecret").value = res.body.secret || "";
+        document.getElementById("otpConfirm").value = "";
+        say("Scan the QR in Google Authenticator, then enter the 6-digit code.", true);
+      })
+      .catch(function () { say("Could not start Authenticator.", false); });
+  };
+
+  document.getElementById("confirmOtp").onclick = function () {
+    var code = document.getElementById("otpConfirm").value.replace(/\s/g, "");
+    fetch("/api/otp/confirm", {
+      method: "POST",
+      headers: Object.assign({ "content-type": "application/json" }, authHeaders()),
+      body: JSON.stringify({ code: code })
+    })
+      .then(function (r) { return r.json().then(function (body) { return { ok: r.ok, body: body }; }); })
+      .then(function (res) {
+        if (!res.ok) { say(res.body.error || "Could not turn on Authenticator.", false); return; }
+        document.getElementById("otpConfirm").value = "";
+        paintOtp({ enabled: true });
+        say("Authenticator is on. Next login needs the 6-digit code.", true);
+      })
+      .catch(function () { say("Could not turn on Authenticator.", false); });
+  };
+
+  document.getElementById("disableOtp").onclick = function () {
+    document.getElementById("otpOffBox").hidden = false;
+    document.getElementById("otpSetup").hidden = true;
+    document.getElementById("otpDisableCode").focus();
+  };
+
+  document.getElementById("confirmDisable").onclick = function () {
+    var code = document.getElementById("otpDisableCode").value.replace(/\s/g, "");
+    fetch("/api/otp/disable", {
+      method: "POST",
+      headers: Object.assign({ "content-type": "application/json" }, authHeaders()),
+      body: JSON.stringify({ code: code })
+    })
+      .then(function (r) { return r.json().then(function (body) { return { ok: r.ok, body: body }; }); })
+      .then(function (res) {
+        if (!res.ok) { say(res.body.error || "Could not turn off Authenticator.", false); return; }
+        document.getElementById("otpDisableCode").value = "";
+        paintOtp({ enabled: false });
+        say("Authenticator is off. Password alone opens admin.", true);
+      })
+      .catch(function () { say("Could not turn off Authenticator.", false); });
+  };
 
   document.getElementById("resetBtn").onclick = function () {
     del("apk_url");
@@ -968,16 +1245,21 @@
   };
   document.getElementById("lockBtn").onclick = function () {
     del("admin_unlocked");
+    del("admin_session");
     panel.hidden = true;
     gate.hidden = false;
     msg.textContent = "";
   };
 
-  if (read("admin_unlocked") === "1") {
-    gate.hidden = true;
-    panel.hidden = false;
-    refreshAll();
-  }
+  loadGoogleConfig();
+  loadOtpStatus(true).then(function () {
+    if (otpOn) return;
+    if (read("admin_unlocked") === "1") {
+      gate.hidden = true;
+      panel.hidden = false;
+      refreshAll();
+    }
+  });
 })();
 </script>
 </body>
