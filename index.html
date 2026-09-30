@@ -205,7 +205,7 @@
     <video id="mirror" class="mirror-bg" muted autoplay loop playsinline preload="metadata" aria-hidden="true">
       <source id="mirrorSource" src="https://github-production-user-asset-6210df.s3.amazonaws.com/326748109/657620961-51f4f6cc-5d64-43b2-ac05-f447da6854dd.mp4?X-Amz-Algorithm=AWS4-HMAC-SHA256&amp;X-Amz-Credential=AKIAVCODYLSA53PQK4ZA%2F20260929%2Fus-east-1%2Fs3%2Faws4_request&amp;X-Amz-Date=20260929T093117Z&amp;X-Amz-Expires=300&amp;X-Amz-Signature=ce9c138f532742e478ba6b311f06bd471c0a8ec4bcbb8eec4ec43003fcff6a53&amp;X-Amz-SignedHeaders=host&amp;response-content-type=video%2Fmp4" type="video/mp4">
     </video>
-    <iframe class="yt is-off" id="yt" title="Video" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe>
+    <iframe class="yt is-off" id="yt" title="Video" referrerpolicy="strict-origin-when-cross-origin" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
     <video id="preview" controls autoplay muted loop playsinline preload="auto">
       <source id="videoSource" src="https://github-production-user-asset-6210df.s3.amazonaws.com/326748109/657620961-51f4f6cc-5d64-43b2-ac05-f447da6854dd.mp4?X-Amz-Algorithm=AWS4-HMAC-SHA256&amp;X-Amz-Credential=AKIAVCODYLSA53PQK4ZA%2F20260929%2Fus-east-1%2Fs3%2Faws4_request&amp;X-Amz-Date=20260929T093117Z&amp;X-Amz-Expires=300&amp;X-Amz-Signature=ce9c138f532742e478ba6b311f06bd471c0a8ec4bcbb8eec4ec43003fcff6a53&amp;X-Amz-SignedHeaders=host&amp;response-content-type=video%2Fmp4" type="video/mp4">
       Your browser does not support video playback.
@@ -287,7 +287,7 @@
       video.pause();
       video.classList.add("is-off");
       yt.classList.remove("is-off");
-      var embed = "https://www.youtube-nocookie.com/embed/" + id + "?autoplay=1&mute=1&playsinline=1&rel=0&modestbranding=1&iv_load_policy=3&controls=1";
+      var embed = "https://www.youtube.com/embed/" + id + "?autoplay=1&mute=1&playsinline=1&rel=0&modestbranding=1&iv_load_policy=3&controls=1";
       if (yt.getAttribute("src") !== embed) yt.setAttribute("src", embed);
       return;
     }

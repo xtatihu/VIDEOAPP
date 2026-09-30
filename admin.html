@@ -151,7 +151,7 @@
         <h3 class="block-title">PLAYLIST</h3>
         <div id="videoList" class="plist"></div>
         <p class="empty" id="videoEmpty">No videos yet. The page keeps its built-in preview until you add one.</p>
-        <iframe class="preview" id="vidFrame" title="Video preview" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen hidden></iframe>
+        <iframe class="preview" id="vidFrame" title="Video preview" referrerpolicy="strict-origin-when-cross-origin" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen hidden></iframe>
         <video class="preview" id="vidPreview" controls playsinline muted hidden></video>
       </div>
       <div class="choice">
@@ -315,7 +315,7 @@
       preview.hidden = true;
       preview.removeAttribute("src");
       frame.hidden = false;
-      frame.setAttribute("src", "https://www.youtube-nocookie.com/embed/" + id + "?autoplay=1&mute=1&playsinline=1&rel=0&modestbranding=1");
+      frame.setAttribute("src", "https://www.youtube.com/embed/" + id + "?autoplay=1&mute=1&playsinline=1&rel=0&modestbranding=1");
       return;
     }
     frame.hidden = true;
