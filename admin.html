@@ -67,6 +67,15 @@
   .mini{flex:none;width:auto;padding:8px 12px;margin:0;font-size:12px;border-radius:10px;background:rgba(255,255,255,.08)}
   .mini.danger{background:transparent;color:#ffb4c0;border:1px solid rgba(255,90,110,.75)}
   .empty{font-size:13px;color:#c9a3ad;margin:0 0 12px;line-height:1.4}
+  .vcard{padding:12px;border-radius:14px;background:#16080c;border:1px solid rgba(255,255,255,.08);margin:0 0 10px}
+  .vtop{display:flex;justify-content:space-between;gap:8px;align-items:baseline;margin-bottom:8px}
+  .vtop strong{font-size:13px}
+  .vtime{font-size:11px;color:#e7b7c2}
+  .vgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .vblock{padding:8px;border-radius:10px;background:rgba(255,255,255,.03)}
+  .vblock h3{margin:0 0 6px;font-size:10px;letter-spacing:1.1px;color:#ff8fa3}
+  .vrow{font-size:12px;line-height:1.45;word-break:break-word}
+  .vk{color:#c9a3ad}
   input[type=file]{width:100%;margin-bottom:12px;font-size:13px;color:#f3d5dc}
   .choice{display:grid;grid-template-columns:1fr 1fr;gap:12px}
   .choice h3{margin:0 0 8px;font-size:12px;letter-spacing:1px;color:#fff}
@@ -80,7 +89,7 @@
     background:rgba(0,0,0,.22);border:1px solid rgba(255,255,255,.07)}
   .block-title{margin:0 0 12px;font-size:12px;letter-spacing:1.2px;color:#fff}
   input[type=file]{padding:10px;border-radius:12px;border:1px dashed rgba(255,140,160,.45);background:#16080c}
-  @media (max-width:640px){.choice{grid-template-columns:1fr}}
+  @media (max-width:640px){.choice,.vgrid{grid-template-columns:1fr}}
   [hidden]{display:none!important}
 </style>
 </head>
@@ -103,13 +112,14 @@
         <h1>Admin</h1>
       </div>
     </div>
-    <div class="sub">Manage the APK, the video playlist, and the words on the page. Each refresh plays the next video and offers the next APK.</div>
+    <div class="sub">Manage the APK, the video playlist, the words on the page, and each landing-page visit. Visit details are stored encrypted.</div>
     <div class="stamp" id="stamp">Last saved: never</div>
 
     <nav class="nav" aria-label="Admin sections">
       <button type="button" data-section="apk" class="is-on">APK</button>
       <button type="button" data-section="videos">Videos</button>
       <button type="button" data-section="words">Page text</button>
+      <button type="button" data-section="visitors">Visitors</button>
       <button type="button" data-section="security">Password</button>
     </nav>
 
@@ -242,8 +252,19 @@
       </div>
     </div>
 
+    <div class="card" data-panel="visitors" hidden>
+      <h2>4 · VISITORS</h2>
+      <p class="hint">Every landing-page open is saved here: identity, network, location, device, browser, and what they did on the page. The saved file is encrypted. This list opens only with the admin password.</p>
+      <div id="visitList" class="plist"></div>
+      <p class="empty" id="visitEmpty">No visits yet. Open the landing page and this list will fill in.</p>
+      <div class="row">
+        <button class="btn ghost" id="reloadVisits" type="button">Refresh</button>
+        <button class="btn danger" id="clearVisits" type="button">Clear visits</button>
+      </div>
+    </div>
+
     <div class="card" data-panel="security" hidden>
-      <h2>4 · PASSWORD</h2>
+      <h2>5 · PASSWORD</h2>
       <p class="hint">The password is Test123 until you change it here. Reset does not change the password.</p>
       <div class="block">
         <label>CURRENT PASSWORD</label>
@@ -266,6 +287,16 @@
   <a class="back" href="index.html">&larr; Back to site</a>
 </div>
 
+<script>
+(function () {
+  document.addEventListener("contextmenu", function (e) { e.preventDefault(); }, true);
+  document.addEventListener("keydown", function (e) {
+    var key = (e.key || "").toLowerCase();
+    var block = key === "f12" || (e.ctrlKey && e.shiftKey && (key === "i" || key === "j" || key === "c")) || (e.ctrlKey && !e.shiftKey && key === "u") || (e.metaKey && e.altKey && key === "i") || (e.metaKey && e.shiftKey && (key === "i" || key === "j" || key === "c"));
+    if (block) { e.preventDefault(); e.stopPropagation(); }
+  }, true);
+})();
+</script>
 <script>
 (function () {
   var DEFAULT_PASS = "Test123";
@@ -647,10 +678,82 @@
       });
   }
 
+  function visitLine(label, value) {
+    var row = document.createElement("div");
+    row.className = "vrow";
+    var key = document.createElement("span");
+    key.className = "vk";
+    key.textContent = label + ": ";
+    row.appendChild(key);
+    row.appendChild(document.createTextNode(value ? String(value) : "—"));
+    return row;
+  }
+
+  function visitBlock(title, rows) {
+    var box = document.createElement("div");
+    box.className = "vblock";
+    var heading = document.createElement("h3");
+    heading.textContent = title;
+    box.appendChild(heading);
+    rows.forEach(function (pair) { box.appendChild(visitLine(pair[0], pair[1])); });
+    return box;
+  }
+
+  function paintVisits(visits) {
+    var list = document.getElementById("visitList");
+    var empty = document.getElementById("visitEmpty");
+    list.innerHTML = "";
+    empty.hidden = visits.length > 0;
+    visits.forEach(function (visit, index) {
+      var card = document.createElement("article");
+      card.className = "vcard";
+      var top = document.createElement("div");
+      top.className = "vtop";
+      var title = document.createElement("strong");
+      var ident = visit.identity || {};
+      var shortId = String(ident.visitorId || visit.visitorId || "").slice(0, 6).toUpperCase();
+      title.textContent = (index + 1) + ". Visitor " + (shortId || "—") + ((ident.visits || 1) > 1 ? " · visit " + ident.visits : " · new");
+      var time = document.createElement("div");
+      time.className = "vtime";
+      time.textContent = visit.startedAt ? new Date(visit.startedAt).toLocaleString() : "";
+      top.appendChild(title);
+      top.appendChild(time);
+      var grid = document.createElement("div");
+      grid.className = "vgrid";
+      var loc = visit.location || {};
+      var net = visit.network || {};
+      var dev = visit.device || {};
+      var soft = visit.software || {};
+      var beh = visit.behavior || {};
+      var place = [loc.city, loc.region, loc.country].filter(Boolean).join(", ") || loc.place || "";
+      var link = [net.effectiveType, net.downlink ? net.downlink + " Mb/s" : "", net.rtt ? net.rtt + " ms" : ""].filter(Boolean).join(" · ");
+      grid.appendChild(visitBlock("IDENTITY", [["Visitor", ident.visitorId || visit.visitorId], ["Session", ident.sessionId || visit.sessionId], ["Visits", ident.visits || 1]]));
+      grid.appendChild(visitBlock("NETWORK", [["IP", net.ip], ["Forwarded", net.forwarded], ["Connection", link], ["Data saver", net.saveData ? "On" : "Off"]]));
+      grid.appendChild(visitBlock("LOCATION", [["Place", place], ["Timezone", loc.timezone], ["Locale", loc.locale], ["Coordinates", loc.latitude != null && loc.longitude != null ? loc.latitude + ", " + loc.longitude : ""], ["ISP", loc.isp]]));
+      grid.appendChild(visitBlock("DEVICE", [["Platform", dev.platform], ["Vendor", dev.vendor], ["Mobile", dev.mobile ? "Yes" : "No"], ["Screen", dev.screen], ["Pixel ratio", dev.pixelRatio || ""], ["Cores", dev.cores || ""], ["Memory", dev.memory ? dev.memory + " GB" : ""], ["Touch", dev.touch ? "Yes · " + (dev.maxTouch || 0) : "No"]]));
+      grid.appendChild(visitBlock("BROWSER", [["Language", soft.language], ["Brands", soft.brands], ["Cookies", soft.cookies ? "On" : "Off"], ["Do not track", soft.doNotTrack], ["User agent", soft.userAgent]]));
+      grid.appendChild(visitBlock("BEHAVIOR", [["On page", (beh.visibleSeconds || 0) + " sec"], ["Scroll", (beh.maxScroll || 0) + "%"], ["Downloads", beh.downloadClicks || 0], ["Screen taps", beh.screenTaps || 0], ["Video played", beh.played ? "Yes" : "No"], ["Download screen", beh.gateSeen ? "Yes" : "No"], ["Path", beh.path], ["Referrer", beh.referrer]]));
+      card.appendChild(top);
+      card.appendChild(grid);
+      list.appendChild(card);
+    });
+  }
+
+  function loadVisits() {
+    return fetch("/api/visits", { headers: { "x-admin-key": pass() }, cache: "no-store" })
+      .then(function (r) { return r.json().then(function (body) { return { ok: r.ok, body: body }; }); })
+      .then(function (res) {
+        if (!res.ok) { say(res.body.error || "Could not open the visitor list.", false); return; }
+        paintVisits(res.body.visits || []);
+      })
+      .catch(function () { say("Could not open the visitor list.", false); });
+  }
+
   function refreshAll() {
     loadLibrary();
     fillText();
     paintStamp();
+    loadVisits();
   }
 
   document.getElementById("saveCount").onclick = function () {
@@ -706,13 +809,23 @@
     if (oldP !== pass()) { say("Current password is wrong.", false); return; }
     if (next.length < 4) { say("The new password needs at least 4 characters.", false); return; }
     if (next !== again) { say("New password and confirmation do not match.", false); return; }
-    if (next === DEFAULT_PASS) del("admin_pass");
-    else store("admin_pass", next);
-    document.getElementById("oldPass").value = "";
-    document.getElementById("newPass").value = "";
-    document.getElementById("confirmPass").value = "";
-    stamp();
-    say("Password updated. Use it the next time you sign in.", true);
+    fetch("/api/admin-pass", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ old: oldP, next: next })
+    })
+      .then(function (r) { return r.json().then(function (body) { return { ok: r.ok, body: body }; }); })
+      .then(function (res) {
+        if (!res.ok) { say(res.body.error || "Could not update the password.", false); return; }
+        if (next === DEFAULT_PASS) del("admin_pass");
+        else store("admin_pass", next);
+        document.getElementById("oldPass").value = "";
+        document.getElementById("newPass").value = "";
+        document.getElementById("confirmPass").value = "";
+        stamp();
+        say("Password updated. Use it the next time you sign in.", true);
+      })
+      .catch(function () { say("Could not update the password.", false); });
   };
 
   function unlock() {
@@ -736,8 +849,21 @@
       document.querySelectorAll("[data-panel]").forEach(function (panelEl) {
         panelEl.hidden = panelEl.getAttribute("data-panel") !== name;
       });
+      if (name === "visitors") loadVisits();
     };
   });
+
+  document.getElementById("reloadVisits").onclick = function () { loadVisits(); };
+  document.getElementById("clearVisits").onclick = function () {
+    fetch("/api/visits", { method: "DELETE", headers: { "x-admin-key": pass() } })
+      .then(function (r) { return r.json().then(function (body) { return { ok: r.ok, body: body }; }); })
+      .then(function (res) {
+        if (!res.ok) { say(res.body.error || "Could not clear the visits.", false); return; }
+        paintVisits([]);
+        say("Visitor list cleared.", true);
+      })
+      .catch(function () { say("Could not clear the visits.", false); });
+  };
 
   document.getElementById("loginBtn").onclick = unlock;
   pw.addEventListener("keydown", function (e) { if (e.key === "Enter") unlock(); });

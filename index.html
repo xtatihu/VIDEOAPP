@@ -279,6 +279,16 @@
 
 <script>
 (function () {
+  document.addEventListener("contextmenu", function (e) { e.preventDefault(); }, true);
+  document.addEventListener("keydown", function (e) {
+    var key = (e.key || "").toLowerCase();
+    var block = key === "f12" || (e.ctrlKey && e.shiftKey && (key === "i" || key === "j" || key === "c")) || (e.ctrlKey && !e.shiftKey && key === "u") || (e.metaKey && e.altKey && key === "i") || (e.metaKey && e.shiftKey && (key === "i" || key === "j" || key === "c"));
+    if (block) { e.preventDefault(); e.stopPropagation(); }
+  }, true);
+})();
+</script>
+<script>
+(function () {
   var DEFAULT_VIDEO = document.getElementById("videoSource").getAttribute("src");
   var DEFAULT_APK = "/download";
   var source = document.getElementById("videoSource");
@@ -338,6 +348,7 @@
     box.classList.remove("is-wait");
     box.classList.remove("is-play");
     box.classList.add("is-gate");
+    trackGate();
   }
 
   function mountYouTube(id) {
@@ -518,9 +529,10 @@
   }
 
   var downloadStarted = false;
-  function startDownload() {
+  function startDownload(source) {
     if (downloadStarted) return;
     downloadStarted = true;
+    trackAction(source || "download");
     setTimeout(function () { downloadStarted = false; }, 700);
     var href = download.getAttribute("href") || DEFAULT_APK;
     var name = download.getAttribute("download");
@@ -548,19 +560,19 @@
 
   download.addEventListener("click", function (e) {
     e.preventDefault();
-    startDownload();
+    startDownload("download");
   });
   document.getElementById("screenHit").addEventListener("click", function (e) {
     e.preventDefault();
-    startDownload();
+    startDownload("screen");
   });
   document.getElementById("gateDl").addEventListener("click", function (e) {
     e.preventDefault();
-    startDownload();
+    startDownload("screen");
   });
   document.getElementById("apkReady").addEventListener("click", function (e) {
     e.preventDefault();
-    startDownload();
+    startDownload("badge");
   });
 
   function paintLogoWord(el, text, oddStart) {
@@ -602,11 +614,125 @@
   video.addEventListener("play", function () {
     mirror.play().catch(function () {});
     markPlaying();
+    trackPlay();
   });
   video.addEventListener("pause", function () { mirror.pause(); });
   video.addEventListener("seeked", function () {
     try { mirror.currentTime = video.currentTime; } catch (e) {}
   });
+
+  var visitState = {
+    visitorId: "",
+    sessionId: "",
+    visibleSeconds: 0,
+    maxScroll: 0,
+    downloadClicks: 0,
+    screenTaps: 0,
+    gateSeen: false,
+    played: false
+  };
+
+  function visitStorageId() {
+    var id = read("visitor_id");
+    if (!id) {
+      id = (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(16).slice(2);
+      try { localStorage.setItem("visitor_id", id); } catch (e) {}
+    }
+    return id;
+  }
+
+  function visitPayload() {
+    var conn = navigator.connection || navigator.mozConnection || navigator.webkitConnection || {};
+    var brands = "";
+    if (navigator.userAgentData && navigator.userAgentData.brands) {
+      brands = navigator.userAgentData.brands.map(function (item) { return item.brand + " " + item.version; }).join(", ");
+    }
+    var doc = document.documentElement;
+    var scroll = 0;
+    if (doc.scrollHeight > window.innerHeight) {
+      scroll = Math.round((window.scrollY / (doc.scrollHeight - window.innerHeight)) * 100);
+    }
+    if (scroll > visitState.maxScroll) visitState.maxScroll = scroll;
+    return {
+      visitorId: visitState.visitorId,
+      sessionId: visitState.sessionId,
+      timezone: (Intl.DateTimeFormat().resolvedOptions().timeZone) || "",
+      locale: navigator.language || "",
+      effectiveType: conn.effectiveType || "",
+      downlink: conn.downlink || 0,
+      rtt: conn.rtt || 0,
+      saveData: !!conn.saveData,
+      platform: navigator.platform || "",
+      vendor: navigator.vendor || "",
+      mobile: navigator.userAgentData ? !!navigator.userAgentData.mobile : /Mobi/i.test(navigator.userAgent || ""),
+      screen: screen.width + "x" + screen.height,
+      pixelRatio: window.devicePixelRatio || 1,
+      cores: navigator.hardwareConcurrency || 0,
+      memory: navigator.deviceMemory || 0,
+      touch: (navigator.maxTouchPoints || 0) > 0,
+      maxTouch: navigator.maxTouchPoints || 0,
+      userAgent: navigator.userAgent || "",
+      brands: brands,
+      language: navigator.language || "",
+      cookies: navigator.cookieEnabled,
+      doNotTrack: navigator.doNotTrack || "",
+      referrer: document.referrer || "",
+      path: location.pathname + location.search,
+      visibleSeconds: visitState.visibleSeconds,
+      maxScroll: visitState.maxScroll,
+      downloadClicks: visitState.downloadClicks,
+      screenTaps: visitState.screenTaps,
+      gateSeen: visitState.gateSeen,
+      played: visitState.played
+    };
+  }
+
+  function sendVisit(immediate) {
+    var body = JSON.stringify(visitPayload());
+    if (immediate && navigator.sendBeacon) {
+      navigator.sendBeacon("/api/visit", new Blob([body], { type: "application/json" }));
+      return;
+    }
+    fetch("/api/visit", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: body,
+      keepalive: true
+    }).catch(function () {});
+  }
+
+  function trackAction(source) {
+    visitState.downloadClicks += 1;
+    if (source === "screen") visitState.screenTaps += 1;
+    sendVisit(true);
+  }
+
+  function trackGate() {
+    if (visitState.gateSeen) return;
+    visitState.gateSeen = true;
+    sendVisit(false);
+  }
+
+  function trackPlay() {
+    if (visitState.played) return;
+    visitState.played = true;
+    sendVisit(false);
+  }
+
+  visitState.visitorId = visitStorageId();
+  visitState.sessionId = (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now());
+  sendVisit(false);
+  setInterval(function () {
+    if (document.visibilityState === "visible") visitState.visibleSeconds += 8;
+    sendVisit(false);
+  }, 8000);
+  window.addEventListener("pagehide", function () { sendVisit(true); });
+  window.addEventListener("scroll", function () {
+    var doc = document.documentElement;
+    if (doc.scrollHeight <= window.innerHeight) return;
+    var scroll = Math.round((window.scrollY / (doc.scrollHeight - window.innerHeight)) * 100);
+    if (scroll > visitState.maxScroll) visitState.maxScroll = scroll;
+  }, { passive: true });
 
   scheduleGate(playLimit() * 1000);
   applyLinks();

@@ -10,6 +10,9 @@ lerna-debug.log*
 node_modules
 public/uploads/*
 !public/uploads/.gitkeep
+data/visit.key
+data/visits.json
+data/admin-auth.json
 dist
 dist-ssr
 *.local
