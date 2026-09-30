@@ -258,21 +258,80 @@
     try { return localStorage.getItem(key); } catch (e) { return null; }
   }
 
-  function applyLinks() {
-    var videoUrl = read("video_url");
-    var apkUrl = read("apk_url");
-    var nextVideo = videoUrl || DEFAULT_VIDEO;
-    var nextApk = apkUrl || DEFAULT_APK;
-    if (source.getAttribute("src") !== nextVideo) {
-      source.setAttribute("src", nextVideo);
-      mirrorSource.setAttribute("src", nextVideo);
+  var playlist = [];
+  var playAt = 0;
+  var pickedVideo = false;
+
+  function setVideoSrc(url) {
+    if (!url) url = DEFAULT_VIDEO;
+    if (source.getAttribute("src") !== url) {
+      source.setAttribute("src", url);
+      mirrorSource.setAttribute("src", url);
       video.load();
       mirror.load();
     }
-    if (download.getAttribute("href") !== nextApk) download.setAttribute("href", nextApk);
+  }
+
+  function showAt(i) {
+    if (!playlist.length) {
+      video.loop = true;
+      mirror.loop = true;
+      setVideoSrc(read("video_url") || DEFAULT_VIDEO);
+      return;
+    }
+    playAt = ((i % playlist.length) + playlist.length) % playlist.length;
+    var many = playlist.length > 1;
+    video.loop = !many;
+    mirror.loop = !many;
+    setVideoSrc(playlist[playAt].url);
+  }
+
+  function loadPlaylist() {
+    if (pickedVideo) return;
+    pickedVideo = true;
+    fetch("/api/play", { method: "POST" })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        playlist = (data && data.videos) || [];
+        showAt(data && isFinite(data.start) ? data.start : 0);
+      })
+      .catch(function () {
+        pickedVideo = false;
+        setVideoSrc(read("video_url") || DEFAULT_VIDEO);
+      });
+  }
+
+  function loadApk() {
+    fetch("/api/library", { cache: "no-store" })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        var href = data && data.apk && data.apk.url;
+        if (!href) href = read("apk_url") || DEFAULT_APK;
+        if (download.getAttribute("href") !== href) download.setAttribute("href", href);
+      })
+      .catch(function () {
+        var href = read("apk_url") || DEFAULT_APK;
+        if (download.getAttribute("href") !== href) download.setAttribute("href", href);
+      });
+  }
+
+  function applyLinks() {
+    loadApk();
+    loadPlaylist();
     applyCopy();
     loadCount();
   }
+
+  video.addEventListener("click", function () {
+    if (playlist.length < 2) return;
+    showAt(playAt + 1);
+    video.play().catch(function () {});
+  });
+  video.addEventListener("ended", function () {
+    if (playlist.length < 2) return;
+    showAt(playAt + 1);
+    video.play().catch(function () {});
+  });
 
   var shown = DEFAULT_COUNT;
   var countPending = false;

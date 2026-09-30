@@ -52,7 +52,20 @@
   .check input{width:18px;height:18px;accent-color:#ff1744}
   video.preview{width:100%;aspect-ratio:16/9;border-radius:12px;background:#0e1013;
     margin-bottom:12px;border:1px solid rgba(255,70,90,.35)}
-  .stamp{font-size:12px;color:#c9a3ad;margin:-6px 0 12px}
+  .stamp{font-size:12px;color:#c9a3ad;margin:0 0 16px}
+  .identity{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:4px}
+  .kicker{margin:0 0 4px;font-size:11px;font-weight:800;letter-spacing:1.8px;color:#ff8fa3}
+  .plist{display:flex;flex-direction:column;gap:8px;margin:0 0 14px}
+  .prow{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:12px;background:#16080c;border:1px solid rgba(255,255,255,.08)}
+  .prow .meta{flex:1;min-width:0}
+  .prow .name{font-size:13px;font-weight:700;word-break:break-all}
+  .prow .kind{font-size:11px;color:#e7b7c2;margin-top:2px}
+  .mini{flex:none;width:auto;padding:8px 12px;margin:0;font-size:12px;border-radius:10px;background:rgba(255,255,255,.08)}
+  .empty{font-size:13px;color:#c9a3ad;margin:0 0 12px;line-height:1.4}
+  input[type=file]{width:100%;margin-bottom:12px;font-size:13px;color:#f3d5dc}
+  .choice{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .choice h3{margin:0 0 8px;font-size:12px;letter-spacing:1px;color:#fff}
+  @media (max-width:640px){.choice{grid-template-columns:1fr}}
   [hidden]{display:none!important}
 </style>
 </head>
@@ -69,18 +82,34 @@
   </div>
 
   <div id="panel" hidden>
-    <h1>VideoApp Admin</h1>
-    <div class="sub">Change the links, page text, 18+ badges, download count, and password. An empty text field saves the original line.</div>
+    <div class="identity">
+      <div>
+        <p class="kicker">VIDEOAPP</p>
+        <h1>Admin</h1>
+      </div>
+    </div>
+    <div class="sub">Manage the APK, the video playlist, and the words on the page. Customers see the next video each time they open the page, and another video each time they tap the player.</div>
     <div class="stamp" id="stamp">Last saved: never</div>
 
     <div class="card">
-      <h2>APK DOWNLOAD LINK</h2>
-      <p class="hint">The download button opens this link. Leave it empty to use /download.</p>
-      <label>CURRENT</label>
-      <div class="current" id="curApk">—</div>
-      <label>NEW LINK</label>
-      <input type="url" id="newApk" placeholder="https://…/app.apk" inputmode="url">
-      <button class="btn" id="saveApk">Save APK Link</button>
+      <h2>APK DOWNLOAD</h2>
+      <p class="hint">Use a link or upload the APK file. The choice you save last is the one customers download.</p>
+      <label>ACTIVE NOW</label>
+      <div class="current" id="curApk">Not set — the button uses /download</div>
+      <div class="choice">
+        <div>
+          <h3>LINK</h3>
+          <label>APK URL</label>
+          <input type="url" id="newApk" placeholder="https://…/app.apk" inputmode="url">
+          <button class="btn" id="saveApk">Save APK Link</button>
+        </div>
+        <div>
+          <h3>UPLOAD</h3>
+          <label>APK FILE</label>
+          <input type="file" id="apkFile" accept=".apk,application/vnd.android.package-archive">
+          <button class="btn" id="uploadApk">Upload APK</button>
+        </div>
+      </div>
       <label>PEOPLE WHO DOWNLOADED</label>
       <input type="number" id="downloadBase" min="0" step="1" inputmode="numeric" placeholder="4793">
       <p class="hint">This number starts at 4,793 and goes up by 1 on every download. Saving here sets a new total. Leave it empty to put it back to 4,793.</p>
@@ -88,19 +117,30 @@
     </div>
 
     <div class="card">
-      <h2>VIDEO LINK</h2>
-      <p class="hint">The landing player and the mirror behind it both play this video.</p>
-      <label>CURRENT</label>
-      <div class="current" id="curVid">—</div>
+      <h2>VIDEOS</h2>
+      <p class="hint">Add a link, upload a file, or both. Add as many as you want. Each new visit starts on the next video. If a customer taps the player, the next video starts.</p>
+      <div id="videoList" class="plist"></div>
+      <p class="empty" id="videoEmpty">No videos yet. The page keeps its built-in preview until you add one.</p>
       <video class="preview" id="vidPreview" controls playsinline muted hidden></video>
-      <label>NEW LINK</label>
-      <input type="url" id="newVid" placeholder="https://…/video.mp4" inputmode="url">
-      <button class="btn" id="saveVid">Save Video Link</button>
+      <div class="choice">
+        <div>
+          <h3>LINK</h3>
+          <label>VIDEO URL</label>
+          <input type="url" id="newVid" placeholder="https://…/video.mp4" inputmode="url">
+          <button class="btn" id="saveVid">Add Video Link</button>
+        </div>
+        <div>
+          <h3>UPLOAD</h3>
+          <label>VIDEO FILE</label>
+          <input type="file" id="videoFile" accept="video/mp4,video/webm,video/ogg,.mp4,.webm,.ogg,.mov,.m4v">
+          <button class="btn" id="uploadVid">Upload Video</button>
+        </div>
+      </div>
     </div>
 
     <div class="card">
       <h2>PAGE TEXT</h2>
-      <p class="hint">These lines show on the page. Emoji are fine. An empty field restores the original text.</p>
+      <p class="hint">Each box already shows the words on the page. Edit them and save. Clear a box and save to restore the original line.</p>
 
       <label>LOGO — FIRST WORD</label>
       <input type="text" id="logoName" placeholder="Video">
@@ -163,6 +203,18 @@
   var DEFAULT_PASS = "Test123";
   var DEFAULT_APK = "/download";
   var TEXT_IDS = ["logoName", "logoAccent", "subtitle", "hotLabel", "watchLine", "dlMain", "dlSmall", "infoTitle", "infoText", "footText"];
+  var PAGE_WORDS = {
+    logoName: "Video",
+    logoAccent: "App",
+    subtitle: "🔞 Watch the preview & download the app 🔞",
+    hotLabel: "HOT 🔥",
+    watchLine: "Download APK to watch FULL video",
+    dlMain: "DOWNLOAD APK 🔥",
+    dlSmall: "Tap here to download 👇",
+    infoTitle: "🔞 40,000+ Hot Videos 🔥🥵😈",
+    infoText: "Download the app to unlock the full collection — no ads. 💋",
+    footText: "VideoApp · 18+ only 🔞💋"
+  };
   var gate = document.getElementById("gate");
   var panel = document.getElementById("panel");
   var pw = document.getElementById("pw");
@@ -185,41 +237,145 @@
     el.textContent = raw ? ("Last saved: " + new Date(Number(raw)).toLocaleString()) : "Last saved: never";
   }
 
-  function section(key, curId, inId, btnId, defLabel) {
-    var cur = document.getElementById(curId);
-    var inp = document.getElementById(inId);
-    function refresh() {
-      cur.textContent = read(key) || defLabel;
-      if (key === "video_url") {
-        var src = read(key);
-        if (src) {
-          if (preview.getAttribute("src") !== src) preview.setAttribute("src", src);
-          preview.hidden = false;
-        } else {
-          preview.removeAttribute("src");
-          preview.hidden = true;
-        }
-      }
-    }
-    document.getElementById(btnId).onclick = function () {
-      var v = inp.value.trim();
-      if (!v) { say("Paste a link first.", false); return; }
-      store(key, v);
-      inp.value = "";
-      stamp();
-      refresh();
-      say("Saved. The landing page now uses the new link.", true);
-    };
-    return { refresh: refresh };
+  function esc(value) {
+    return String(value).replace(/[&<>"']/g, function (ch) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch];
+    });
   }
 
-  var apkSec = section("apk_url", "curApk", "newApk", "saveApk", DEFAULT_APK + " (default)");
-  var vidSec = section("video_url", "curVid", "newVid", "saveVid", "(page default video)");
+  function paintLibrary(lib) {
+    var apk = lib && lib.apk;
+    var cur = document.getElementById("curApk");
+    if (!apk || !apk.url) {
+      cur.textContent = "Not set — the button uses /download";
+    } else if (apk.type === "file") {
+      cur.textContent = "Uploaded file: " + (apk.name || apk.url);
+    } else {
+      cur.textContent = "Link: " + apk.url;
+    }
+
+    var videos = (lib && lib.videos) || [];
+    var list = document.getElementById("videoList");
+    var empty = document.getElementById("videoEmpty");
+    empty.hidden = videos.length > 0;
+    list.innerHTML = videos.map(function (item, index) {
+      var label = item.type === "file" ? "Uploaded file" : "Link";
+      return '<div class="prow"><div class="meta"><div class="name">' + (index + 1) + ". " + esc(item.name || item.url) + '</div><div class="kind">' + label + "</div></div><button class="btn mini" type="button" data-remove=\"" + esc(item.id) + "\">Remove</button></div>";
+    }).join("");
+    list.querySelectorAll("[data-remove]").forEach(function (btn) {
+      btn.onclick = function () { removeVideo(btn.getAttribute("data-remove")); };
+    });
+
+    if (videos.length) {
+      var src = videos[0].url;
+      if (preview.getAttribute("src") !== src) preview.setAttribute("src", src);
+      preview.hidden = false;
+    } else {
+      preview.removeAttribute("src");
+      preview.hidden = true;
+    }
+  }
+
+  function loadLibrary() {
+    return fetch("/api/library", { cache: "no-store" })
+      .then(function (r) { return r.json(); })
+      .then(function (lib) { paintLibrary(lib); return lib; })
+      .catch(function () { say("Could not load the APK and video list.", false); });
+  }
+
+  function removeVideo(id) {
+    fetch("/api/library/videos", {
+      method: "DELETE",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ id: id })
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (lib) {
+        paintLibrary(lib);
+        stamp();
+        say("Video removed.", true);
+      })
+      .catch(function () { say("Could not remove that video.", false); });
+  }
+
+  document.getElementById("saveApk").onclick = function () {
+    var url = document.getElementById("newApk").value.trim();
+    if (!url) { say("Paste an APK link first.", false); return; }
+    fetch("/api/library/apk", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ url: url })
+    })
+      .then(function (r) { return r.json().then(function (body) { return { ok: r.ok, body: body }; }); })
+      .then(function (res) {
+        if (!res.ok) { say(res.body.error || "Could not save the APK link.", false); return; }
+        store("apk_url", url);
+        document.getElementById("newApk").value = "";
+        paintLibrary(res.body);
+        stamp();
+        say("APK link saved. The download button uses this link.", true);
+      })
+      .catch(function () { say("Could not save the APK link.", false); });
+  };
+
+  document.getElementById("uploadApk").onclick = function () {
+    var file = document.getElementById("apkFile").files[0];
+    if (!file) { say("Choose an APK file first.", false); return; }
+    var data = new FormData();
+    data.append("file", file);
+    fetch("/api/upload?kind=apk", { method: "POST", body: data })
+      .then(function (r) { return r.json().then(function (body) { return { ok: r.ok, body: body }; }); })
+      .then(function (res) {
+        if (!res.ok) { say(res.body.error || "Upload failed.", false); return; }
+        if (res.body.apk && res.body.apk.url) store("apk_url", res.body.apk.url);
+        document.getElementById("apkFile").value = "";
+        paintLibrary(res.body);
+        stamp();
+        say("APK uploaded. The download button uses this file.", true);
+      })
+      .catch(function () { say("Upload failed.", false); });
+  };
+
+  document.getElementById("saveVid").onclick = function () {
+    var url = document.getElementById("newVid").value.trim();
+    if (!url) { say("Paste a video link first.", false); return; }
+    fetch("/api/library/videos", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ url: url })
+    })
+      .then(function (r) { return r.json().then(function (body) { return { ok: r.ok, body: body }; }); })
+      .then(function (res) {
+        if (!res.ok) { say(res.body.error || "Could not add that video.", false); return; }
+        document.getElementById("newVid").value = "";
+        paintLibrary(res.body);
+        stamp();
+        say("Video link added.", true);
+      })
+      .catch(function () { say("Could not add that video.", false); });
+  };
+
+  document.getElementById("uploadVid").onclick = function () {
+    var file = document.getElementById("videoFile").files[0];
+    if (!file) { say("Choose a video file first.", false); return; }
+    var data = new FormData();
+    data.append("file", file);
+    fetch("/api/upload?kind=video", { method: "POST", body: data })
+      .then(function (r) { return r.json().then(function (body) { return { ok: r.ok, body: body }; }); })
+      .then(function (res) {
+        if (!res.ok) { say(res.body.error || "Upload failed.", false); return; }
+        document.getElementById("videoFile").value = "";
+        paintLibrary(res.body);
+        stamp();
+        say("Video uploaded and added to the list.", true);
+      })
+      .catch(function () { say("Upload failed.", false); });
+  };
 
   function fillText() {
     TEXT_IDS.forEach(function (id) {
       var el = document.getElementById(id);
-      el.value = read(id) || "";
+      el.value = read(id) || PAGE_WORDS[id] || "";
     });
     document.getElementById("show18").checked = read("show_18") !== "0";
     fetch("/api/downloads", { cache: "no-store" })
@@ -233,8 +389,7 @@
   }
 
   function refreshAll() {
-    apkSec.refresh();
-    vidSec.refresh();
+    loadLibrary();
     fillText();
     paintStamp();
   }
@@ -260,12 +415,13 @@
   document.getElementById("saveText").onclick = function () {
     TEXT_IDS.forEach(function (id) {
       var v = document.getElementById(id).value.trim();
-      if (v) store(id, v);
-      else del(id);
+      if (!v || v === PAGE_WORDS[id]) del(id);
+      else store(id, v);
     });
     if (document.getElementById("show18").checked) del("show_18");
     else store("show_18", "0");
     stamp();
+    fillText();
     say("Page text saved. Refresh the landing page.", true);
   };
 
@@ -306,13 +462,16 @@
     TEXT_IDS.forEach(del);
     del("show_18");
     del("admin_saved_at");
-    fetch("/api/downloads", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ count: 4793 })
-    }).finally(function () {
+    Promise.all([
+      fetch("/api/downloads", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ count: 4793 })
+      }),
+      fetch("/api/library/reset", { method: "POST" })
+    ]).finally(function () {
       refreshAll();
-      say("Reset. Links, page text, and the download count are back to the defaults. The password is unchanged.", true);
+      say("Reset. The APK, videos, page text, and download count are back to the defaults. The password is unchanged.", true);
     });
   };
   document.getElementById("lockBtn").onclick = function () {
