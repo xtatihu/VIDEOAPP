@@ -71,7 +71,7 @@
   .mirror-bg{position:absolute;inset:-8%;width:116%;height:116%;object-fit:cover;z-index:0;
     transform:scaleX(-1);filter:blur(16px) saturate(1.05) brightness(.8);pointer-events:none}
   .video-box video#preview,.video-box iframe{position:absolute;z-index:2;left:0;top:0;width:100%;height:100%;
-    min-height:0;max-height:none;object-fit:cover;border:0;border-radius:16px;background:transparent;
+    min-height:0;max-height:none;object-fit:cover;border:0;border-radius:16px;background:#0e1013;
     box-shadow:none}
   .hue{position:absolute;inset:0;z-index:1;border-radius:16px;pointer-events:none;
     background:linear-gradient(120deg,#ff1744,#ffb703,#7b2ff7,#00c2ff,#ff2d8a,#ff1744);
@@ -229,14 +229,9 @@
     <span class="sticker s8" aria-hidden="true">🥵</span>
     <span class="sticker s9" aria-hidden="true">😈</span>
     <span class="sticker s10" aria-hidden="true">🌶️</span>
-    <video id="mirror" class="mirror-bg" muted autoplay loop playsinline preload="metadata" aria-hidden="true">
-      <source id="mirrorSource" src="https://github-production-user-asset-6210df.s3.amazonaws.com/326748109/657620961-51f4f6cc-5d64-43b2-ac05-f447da6854dd.mp4?X-Amz-Algorithm=AWS4-HMAC-SHA256&amp;X-Amz-Credential=AKIAVCODYLSA53PQK4ZA%2F20260929%2Fus-east-1%2Fs3%2Faws4_request&amp;X-Amz-Date=20260929T093117Z&amp;X-Amz-Expires=300&amp;X-Amz-Signature=ce9c138f532742e478ba6b311f06bd471c0a8ec4bcbb8eec4ec43003fcff6a53&amp;X-Amz-SignedHeaders=host&amp;response-content-type=video%2Fmp4" type="video/mp4">
-    </video>
-    <iframe class="yt is-off" id="yt" title="Video" referrerpolicy="strict-origin-when-cross-origin" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
-    <video id="preview" controls autoplay muted loop playsinline preload="auto">
-      <source id="videoSource" src="https://github-production-user-asset-6210df.s3.amazonaws.com/326748109/657620961-51f4f6cc-5d64-43b2-ac05-f447da6854dd.mp4?X-Amz-Algorithm=AWS4-HMAC-SHA256&amp;X-Amz-Credential=AKIAVCODYLSA53PQK4ZA%2F20260929%2Fus-east-1%2Fs3%2Faws4_request&amp;X-Amz-Date=20260929T093117Z&amp;X-Amz-Expires=300&amp;X-Amz-Signature=ce9c138f532742e478ba6b311f06bd471c0a8ec4bcbb8eec4ec43003fcff6a53&amp;X-Amz-SignedHeaders=host&amp;response-content-type=video%2Fmp4" type="video/mp4">
-      Your browser does not support video playback.
-    </video>
+    <video id="mirror" class="mirror-bg" muted autoplay loop playsinline preload="none" aria-hidden="true"></video>
+    <iframe class="yt is-off" id="yt" title="Video" referrerpolicy="strict-origin-when-cross-origin" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe>
+    <video id="preview" autoplay muted loop playsinline preload="auto"></video>
     <div class="video-fade"></div>
     <div class="watch-text">
       <span class="hot" id="hotLabel" data-default="HOT 🔥">HOT 🔥</span><br>
@@ -279,8 +274,14 @@
 
 <script>
 (function () {
-  document.addEventListener("contextmenu", function (e) { e.preventDefault(); }, true);
+  document.addEventListener("contextmenu", function (e) {
+    var el = e.target;
+    if (el && el.closest && el.closest("input, textarea")) return;
+    e.preventDefault();
+  }, true);
   document.addEventListener("keydown", function (e) {
+    var tag = (e.target && e.target.tagName) || "";
+    if (tag === "INPUT" || tag === "TEXTAREA") return;
     var key = (e.key || "").toLowerCase();
     var block = key === "f12" || (e.ctrlKey && e.shiftKey && (key === "i" || key === "j" || key === "c")) || (e.ctrlKey && !e.shiftKey && key === "u") || (e.metaKey && e.altKey && key === "i") || (e.metaKey && e.shiftKey && (key === "i" || key === "j" || key === "c"));
     if (block) { e.preventDefault(); e.stopPropagation(); }
@@ -289,10 +290,7 @@
 </script>
 <script>
 (function () {
-  var DEFAULT_VIDEO = document.getElementById("videoSource").getAttribute("src");
   var DEFAULT_APK = "/download";
-  var source = document.getElementById("videoSource");
-  var mirrorSource = document.getElementById("mirrorSource");
   var video = document.getElementById("preview");
   var mirror = document.getElementById("mirror");
   var download = document.getElementById("download");
@@ -309,8 +307,6 @@
 
   var yt = document.getElementById("yt");
   var box = document.getElementById("videoBox");
-  var player = null;
-  var ytApi = false;
   var gated = false;
   var playClock = false;
   var gateTimer = 0;
@@ -328,23 +324,45 @@
     gateTimer = setTimeout(showGate, ms);
   }
 
-  function markPlaying() {
+  function revealVideo() {
     if (gated) return;
     box.classList.add("is-play");
     box.classList.remove("is-wait");
+  }
+
+  function markPlaying() {
+    if (gated) return;
+    revealVideo();
     if (!playClock) {
       playClock = true;
       scheduleGate(playLimit() * 1000);
     }
   }
 
+  var ytWatching = false;
+  function watchYouTube() {
+    if (ytWatching) return;
+    ytWatching = true;
+    window.addEventListener("message", function (event) {
+      if (String(event.origin || "").indexOf("youtube.com") === -1) return;
+      var data = event.data;
+      if (typeof data === "string") {
+        try { data = JSON.parse(data); } catch (e) { return; }
+      }
+      if (!data) return;
+      var state = data.info;
+      if (state && typeof state === "object") state = state.playerState;
+      if ((data.event === "onStateChange" || data.event === "infoDelivery") && state === 1) markPlaying();
+    });
+  }
+
   function showGate() {
     if (gated) return;
     gated = true;
     clearTimeout(gateTimer);
-    try { video.pause(); } catch (e) {}
-    try { mirror.pause(); } catch (e) {}
-    try { if (player && player.stopVideo) player.stopVideo(); } catch (e) {}
+    try { video.pause(); video.removeAttribute("src"); } catch (e) {}
+    try { mirror.pause(); mirror.removeAttribute("src"); } catch (e) {}
+    try { yt.removeAttribute("src"); } catch (e) {}
     box.classList.remove("is-wait");
     box.classList.remove("is-play");
     box.classList.add("is-gate");
@@ -352,48 +370,19 @@
   }
 
   function mountYouTube(id) {
+    watchYouTube();
     video.pause();
     video.classList.add("is-off");
+    try { video.removeAttribute("src"); } catch (e) {}
     yt.classList.remove("is-off");
-    function ready() {
-      if (gated) return;
-      if (player && player.loadVideoById) {
-        player.loadVideoById(id);
-        return;
-      }
-      player = new YT.Player(yt, {
-        videoId: id,
-        playerVars: {
-          autoplay: 1,
-          mute: 1,
-          playsinline: 1,
-          rel: 0,
-          modestbranding: 1,
-          controls: 0,
-          iv_load_policy: 3,
-          disablekb: 1
-        },
-        events: {
-          onStateChange: function (event) {
-            if (event.data === 1) markPlaying();
-          }
-        }
-      });
-    }
-    if (window.YT && window.YT.Player) ready();
-    else {
-      var previous = window.onYouTubeIframeAPIReady;
-      window.onYouTubeIframeAPIReady = function () {
-        if (typeof previous === "function") previous();
-        ready();
-      };
-      if (!ytApi) {
-        ytApi = true;
-        var script = document.createElement("script");
-        script.src = "https://www.youtube.com/iframe_api";
-        document.head.appendChild(script);
-      }
-    }
+    var src = "https://www.youtube.com/embed/" + encodeURIComponent(id) + "?autoplay=1&mute=1&playsinline=1&rel=0&modestbranding=1&controls=0&iv_load_policy=3&enablejsapi=1&origin=" + encodeURIComponent(location.origin);
+    if (yt.getAttribute("src") !== src) yt.src = src;
+    revealVideo();
+    var poke = function () {
+      try { yt.contentWindow.postMessage(JSON.stringify({ event: "listening", id: "yt", channel: "widget" }), "*"); } catch (e) {}
+    };
+    yt.addEventListener("load", poke);
+    setTimeout(function () { markPlaying(); }, 1500);
   }
 
   function youtubeId(url) {
@@ -412,7 +401,6 @@
 
   function setVideoSrc(url) {
     if (gated) return;
-    if (!url) url = DEFAULT_VIDEO;
     var id = youtubeId(url);
     if (id) {
       mountYouTube(id);
@@ -422,29 +410,26 @@
     yt.removeAttribute("src");
     video.classList.remove("is-off");
     video.muted = true;
-    mirror.muted = true;
-    if (video.getAttribute("src") !== url) {
-      video.setAttribute("src", url);
-      source.setAttribute("src", url);
-      mirror.setAttribute("src", url);
-      mirrorSource.setAttribute("src", url);
-      video.load();
-      mirror.load();
-    }
+    video.autoplay = true;
+    video.playsInline = true;
+    if (!url) return;
+    if (video.getAttribute("src") !== url) video.src = url;
     var start = function () {
-      video.play().catch(function () {});
+      var pending = video.play();
+      if (pending && pending.catch) pending.catch(function () {});
+      if (mirror.getAttribute("src") !== url) mirror.src = url;
       mirror.play().catch(function () {});
       markPlaying();
     };
-    if (video.readyState >= 2) start();
-    else video.addEventListener("canplay", start, { once: true });
+    start();
+    if (video.readyState < 2) video.addEventListener("loadeddata", start, { once: true });
   }
 
   function showAt(i) {
     if (!playlist.length) {
       video.loop = true;
       mirror.loop = true;
-      setVideoSrc(read("video_url") || DEFAULT_VIDEO);
+      setVideoSrc(read("video_url") || "");
       return;
     }
     playAt = ((i % playlist.length) + playlist.length) % playlist.length;
@@ -465,7 +450,7 @@
       })
       .catch(function () {
         pickedVideo = false;
-        setVideoSrc(read("video_url") || DEFAULT_VIDEO);
+        setVideoSrc(read("video_url") || "");
       });
   }
 
@@ -893,7 +878,6 @@
     if (scroll > visitState.maxScroll) visitState.maxScroll = scroll;
   }, { passive: true });
 
-  scheduleGate(playLimit() * 1000);
   applyLinks();
   setInterval(loadCount, 4000);
   window.addEventListener("pageshow", applyLinks);

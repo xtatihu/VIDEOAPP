@@ -204,23 +204,6 @@ export function visitsApi(root) {
     return passwordOk(req.headers["x-admin-key"]) || sessionOk(req.headers["x-admin-session"]);
   }
 
-  function readGoogle() {
-    const auth = readAuth();
-    return {
-      clientId: clip(auth.googleClientId, 200),
-      email: clip(auth.googleEmail, 120).toLowerCase(),
-    };
-  }
-
-  function saveGoogle(clientId, email) {
-    const auth = readAuth();
-    auth.googleClientId = clip(clientId, 200);
-    auth.googleEmail = clip(email, 120).toLowerCase();
-    ensureDir();
-    fs.writeFileSync(authFile, JSON.stringify(auth));
-    try { fs.chmodSync(authFile, 0o600); } catch (e) {}
-  }
-
   function readOtp() {
     const auth = readAuth();
     let secret = "";
@@ -261,8 +244,6 @@ export function visitsApi(root) {
     fs.writeFileSync(authFile, JSON.stringify({
       salt,
       hash,
-      googleClientId: prev.googleClientId || "",
-      googleEmail: prev.googleEmail || "",
       otpEnabled: prev.otpEnabled === true,
       otpSecret: prev.otpSecret || "",
       otpPending: prev.otpPending || "",
@@ -488,7 +469,7 @@ export function visitsApi(root) {
       server.middlewares.use((req, res, next) => {
         const pathOnly = (req.url || "").split("?")[0];
         const otpPath = pathOnly === "/api/otp-status" || pathOnly === "/api/otp/setup" || pathOnly === "/api/otp/confirm" || pathOnly === "/api/otp/disable";
-        if (pathOnly !== "/api/visit" && pathOnly !== "/api/visits" && pathOnly !== "/api/admin-pass" && pathOnly !== "/api/login" && pathOnly !== "/api/google-config" && pathOnly !== "/api/google-login" && !otpPath) return next();
+        if (pathOnly !== "/api/visit" && pathOnly !== "/api/visits" && pathOnly !== "/api/admin-pass" && pathOnly !== "/api/login" && !otpPath) return next();
 
         if (req.method === "POST" && pathOnly === "/api/visit") {
           readBody(req)
@@ -594,67 +575,6 @@ export function visitsApi(root) {
               send(res, 200, { enabled: false });
             })
             .catch(() => send(res, 400, { error: "Could not turn off Authenticator." }));
-          return;
-        }
-
-        if (req.method === "GET" && pathOnly === "/api/google-config") {
-          const google = readGoogle();
-          if (authorized(req)) send(res, 200, google);
-          else send(res, 200, { clientId: google.clientId });
-          return;
-        }
-
-        if (req.method === "POST" && pathOnly === "/api/google-config") {
-          if (!authorized(req)) {
-            send(res, 401, { error: "Wrong password." });
-            return;
-          }
-          readBody(req)
-            .then((body) => {
-              const clientId = clip(body.clientId, 200);
-              const email = clip(body.email, 120).toLowerCase();
-              if (clientId && !clientId.endsWith(".apps.googleusercontent.com")) {
-                send(res, 400, { error: "Paste the Web client ID from Google Cloud." });
-                return;
-              }
-              if (email && !email.includes("@")) {
-                send(res, 400, { error: "Enter the Gmail address that may open admin." });
-                return;
-              }
-              saveGoogle(clientId, email);
-              send(res, 200, { clientId, email });
-            })
-            .catch(() => send(res, 400, { error: "Could not save Google sign-in." }));
-          return;
-        }
-
-        if (req.method === "POST" && pathOnly === "/api/google-login") {
-          readBody(req)
-            .then(async (body) => {
-              const blocked = otpGate(body);
-              if (blocked) {
-                send(res, 401, blocked);
-                return;
-              }
-              const google = readGoogle();
-              if (!google.clientId || !google.email) {
-                send(res, 400, { error: "Save a Google Client ID and Gmail in the Password section first." });
-                return;
-              }
-              const credential = String(body.credential || "");
-              if (!credential || credential.length > 4000) {
-                send(res, 401, { error: "Google sign-in failed." });
-                return;
-              }
-              const info = await fetchJson("https://oauth2.googleapis.com/tokeninfo?id_token=" + encodeURIComponent(credential));
-              const verified = info && (info.email_verified === true || info.email_verified === "true");
-              if (!info || info.aud !== google.clientId || !verified || clip(info.email, 120).toLowerCase() !== google.email) {
-                send(res, 401, { error: "This Google account cannot open the admin." });
-                return;
-              }
-              send(res, 200, { session: issueSession(), email: google.email });
-            })
-            .catch(() => send(res, 401, { error: "Google sign-in failed." }));
           return;
         }
 
