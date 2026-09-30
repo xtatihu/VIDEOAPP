@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#09080b">
+<meta name="description" content="Watch the preview and download the app. 18+ only.">
+<title>VideoApp</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #09080b;
+    --cream: #f6f1ea;
+    --muted: #b7aea6;
+    --faint: #8d847c;
+    --line: rgba(246, 241, 234, 0.12);
+    --rose: #ff3b5c;
+    --rose-deep: #d0123a;
+    --gold: #e7c27a;
+    --card: rgba(255, 255, 255, 0.035);
+    --serif: "Instrument Serif", Georgia, "Times New Roman", serif;
+    --sans: Manrope, "Segoe UI", sans-serif;
+  }
+
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    color: var(--cream);
+    font-family: var(--sans);
+    background:
+      radial-gradient(900px 520px at 15% -10%, rgba(255, 59, 92, 0.22), transparent 55%),
+      radial-gradient(700px 480px at 110% 80%, rgba(90, 20, 40, 0.55), transparent 50%),
+      var(--bg);
+  }
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0.18;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)' opacity='.55'/></svg>");
+  }
+  ::selection { background: var(--gold); color: #1a1208; }
+  a { color: inherit; }
+
+  .shell {
+    width: min(1080px, calc(100% - 32px));
+    margin: 0 auto;
+    padding: 28px 0 120px;
+    display: grid;
+    gap: 28px;
+  }
+
+  .top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+  }
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    text-decoration: none;
+  }
+  .mark {
+    width: 46px;
+    height: 46px;
+    flex: none;
+    filter: drop-shadow(0 8px 18px rgba(255, 59, 92, 0.35));
+  }
+  .word {
+    margin: 0;
+    font-family: var(--serif);
+    font-size: 32px;
+    font-weight: 400;
+    letter-spacing: -0.03em;
+    line-height: 1;
+  }
+  .word span { font-style: italic; color: var(--rose); }
+  .age {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 12px 7px 8px;
+    border-radius: 999px;
+    border: 1px solid rgba(231, 194, 122, 0.45);
+    background: rgba(231, 194, 122, 0.08);
+    color: var(--gold);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+  }
+  .age svg { width: 34px; height: 22px; }
+
+  .layout {
+    display: grid;
+    gap: 28px;
+    align-items: center;
+  }
+
+  .eyebrow {
+    margin: 0 0 12px;
+    color: var(--gold);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+  }
+  h1 {
+    margin: 0;
+    font-family: var(--serif);
+    font-weight: 400;
+    font-size: clamp(2.7rem, 6vw, 5.1rem);
+    line-height: 0.92;
+    letter-spacing: -0.03em;
+  }
+  h1 em {
+    font-style: italic;
+    color: var(--rose);
+  }
+  .lead {
+    margin: 18px 0 0;
+    max-width: 34rem;
+    color: var(--muted);
+    font-size: 1.05rem;
+    line-height: 1.6;
+  }
+
+  .facts {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1px;
+    margin: 26px 0 0;
+    padding: 0;
+    list-style: none;
+    overflow: hidden;
+    border-radius: 18px;
+    background: var(--line);
+    border: 1px solid var(--line);
+  }
+  .facts li {
+    background: #120f13;
+    padding: 14px 12px;
+  }
+  .facts strong {
+    display: block;
+    font-size: 15px;
+    font-weight: 750;
+    letter-spacing: -0.02em;
+  }
+  .facts span {
+    display: block;
+    margin-top: 3px;
+    color: var(--faint);
+    font-size: 12px;
+    line-height: 1.35;
+  }
+
+  .cta {
+    margin-top: 22px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    width: 100%;
+    max-width: 440px;
+    padding: 16px 18px;
+    border-radius: 18px;
+    text-decoration: none;
+    color: white;
+    background: linear-gradient(180deg, #ff4d6a 0%, var(--rose-deep) 100%);
+    box-shadow: 0 16px 40px -18px rgba(255, 59, 92, 0.95);
+    transition: transform 0.15s ease, filter 0.15s ease;
+  }
+  .cta:hover { transform: translateY(-1px); filter: brightness(1.05); }
+  .cta:active { transform: translateY(0) scale(0.99); }
+  .cta:focus-visible, .dock:focus-visible, .brand:focus-visible {
+    outline: 2px solid var(--cream);
+    outline-offset: 3px;
+  }
+  .cta-icon, .dock-icon {
+    width: 42px;
+    height: 42px;
+    flex: none;
+    display: grid;
+    place-items: center;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.14);
+  }
+  .cta-icon svg, .dock-icon svg { width: 22px; height: 22px; }
+  .cta strong, .dock strong {
+    display: block;
+    font-size: 16px;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+  }
+  .cta small, .dock small {
+    display: block;
+    margin-top: 2px;
+    font-size: 12.5px;
+    font-weight: 500;
+    opacity: 0.86;
+  }
+  .note {
+    margin: 12px 0 0;
+    color: var(--faint);
+    font-size: 13px;
+  }
+
+  .stage { min-width: 0; }
+  .screen {
+    position: relative;
+    overflow: hidden;
+    border-radius: 28px;
+    background: #050505;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow:
+      0 30px 80px -30px rgba(0, 0, 0, 0.8),
+      0 0 0 1px rgba(255, 255, 255, 0.03);
+  }
+  video {
+    display: block;
+    width: 100%;
+    max-height: min(70vh, 680px);
+    background: #050505;
+  }
+  .fallback {
+    min-height: 460px;
+    display: grid;
+    place-items: center;
+    text-align: center;
+    padding: 36px 24px;
+    background:
+      radial-gradient(140px 90px at 50% 40%, rgba(255, 255, 255, 0.16), transparent 62%),
+      radial-gradient(380px 260px at 50% 28%, rgba(255, 59, 92, 0.42), transparent 60%),
+      linear-gradient(165deg, #3a1520 0%, #14090d 48%, #070607 100%);
+  }
+  .fallback[hidden] { display: none; }
+  .play {
+    width: 78px;
+    height: 78px;
+    margin: 0 auto 18px;
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    background: rgba(9, 8, 11, 0.35);
+    border: 1px solid rgba(255, 255, 255, 0.28);
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.35);
+    backdrop-filter: blur(8px);
+  }
+  .play svg { width: 28px; height: 28px; margin-left: 3px; }
+  .fallback p {
+    margin: 0;
+    font-family: var(--serif);
+    font-size: 32px;
+    line-height: 1;
+  }
+  .fallback span {
+    display: block;
+    margin-top: 10px;
+    color: rgba(246, 241, 234, 0.78);
+    font-family: var(--sans);
+    font-size: 14px;
+  }
+  .chip {
+    position: absolute;
+    top: 14px;
+    left: 14px;
+    z-index: 2;
+    padding: 6px 10px;
+    border-radius: 999px;
+    background: rgba(9, 8, 11, 0.55);
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    backdrop-filter: blur(10px);
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+  }
+  .under {
+    margin: 14px 4px 0;
+    color: var(--muted);
+    font-size: 15px;
+    line-height: 1.5;
+  }
+  .under b { color: var(--cream); font-weight: 700; }
+
+  .foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-top: 8px;
+    padding-top: 18px;
+    border-top: 1px solid var(--line);
+    color: var(--faint);
+    font-size: 12.5px;
+  }
+  .ok {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    color: #8ee0ad;
+    font-weight: 700;
+  }
+  .ok i {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #22c55e;
+    box-shadow: 0 0 8px #22c55e;
+  }
+
+  .dock {
+    display: none;
+    position: fixed;
+    left: 12px;
+    right: 12px;
+    bottom: calc(12px + env(safe-area-inset-bottom));
+    z-index: 5;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 14px;
+    border-radius: 18px;
+    text-decoration: none;
+    color: white;
+    background: linear-gradient(180deg, #ff4d6a, var(--rose-deep));
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.4);
+  }
+  .dock.is-on { display: flex; }
+
+  @media (min-width: 900px) {
+    .shell { padding: 36px 0 48px; }
+    .layout {
+      grid-template-columns: minmax(0, 1.05fr) minmax(320px, 0.9fr);
+      gap: 56px;
+    }
+    .facts li { padding: 16px 16px; }
+    .dock { display: none !important; }
+  }
+
+  @media (max-width: 640px) {
+    .facts strong { font-size: 13px; }
+    .fallback { min-height: 380px; }
+    h1 { font-size: 3.15rem; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    .cta { transition: none; }
+  }
+</style>
+</head>
+<body>
+<main class="shell">
+  <header class="top">
+    <a class="brand" href="#preview-title">
+      <svg class="mark" viewBox="0 0 64 64" aria-hidden="true">
+        <rect width="64" height="64" rx="18" fill="#ff3b5c"/>
+        <path fill="#fff" d="M26 20.5v23l20-11.5z"/>
+      </svg>
+      <p class="word">Video<span>App</span></p>
+    </a>
+    <div class="age" aria-label="Adults only, 18 plus">
+      <svg viewBox="0 0 48 28" aria-hidden="true">
+        <rect x="1.2" y="1.2" width="45.6" height="25.6" rx="8" fill="none" stroke="currentColor" stroke-width="1.6"/>
+        <text x="24" y="19" text-anchor="middle" font-family="Manrope, sans-serif" font-size="12" font-weight="700" fill="currentColor">18+</text>
+      </svg>
+      Adults only
+    </div>
+  </header>
+
+  <div class="layout">
+    <section>
+      <p class="eyebrow">Direct APK</p>
+      <h1 id="preview-title">Watch the preview.<br><em>Get the full video.</em></h1>
+      <p class="lead">Watch the preview and download the app. The full collection unlocks after install — no ads.</p>
+
+      <ul class="facts">
+        <li><strong>40,000+</strong><span>Hot videos</span></li>
+        <li><strong>No ads</strong><span>Inside the app</span></li>
+        <li><strong>APK</strong><span>Available now</span></li>
+      </ul>
+
+      <a class="cta" id="download" href="/download">
+        <span class="cta-icon" aria-hidden="true">
+          <svg viewBox="0 0 48 48">
+            <path fill="#fff" d="M24 6a2.5 2.5 0 0 1 2.5 2.5v15.2l5.2-5.2a2.5 2.5 0 0 1 3.5 3.5L25.8 36.4a2.5 2.5 0 0 1-3.6 0L12.8 21.9a2.5 2.5 0 1 1 3.5-3.5l5.2 5.2V8.5A2.5 2.5 0 0 1 24 6z"/>
+            <path fill="#fff" d="M10 36h28a2.5 2.5 0 0 1 0 5H10a2.5 2.5 0 0 1 0-5z" opacity=".85"/>
+          </svg>
+        </span>
+        <span>
+          <strong>DOWNLOAD APK</strong>
+          <small>Tap here to download</small>
+        </span>
+      </a>
+      <p class="note">Android install · 18+ only</p>
+    </section>
+
+    <section class="stage" aria-label="Video preview">
+      <div class="screen">
+        <span class="chip">Preview</span>
+        <video id="preview" controls autoplay muted loop playsinline preload="metadata">
+          <source src="https://github-production-user-asset-6210df.s3.amazonaws.com/326748109/657620961-51f4f6cc-5d64-43b2-ac05-f447da6854dd.mp4?X-Amz-Algorithm=AWS4-HMAC-SHA256&amp;X-Amz-Credential=AKIAVCODYLSA53PQK4ZA%2F20260929%2Fus-east-1%2Fs3%2Faws4_request&amp;X-Amz-Date=20260929T093117Z&amp;X-Amz-Expires=300&amp;X-Amz-Signature=ce9c138f532742e478ba6b311f06bd471c0a8ec4bcbb8eec4ec43003fcff6a53&amp;X-Amz-SignedHeaders=host&amp;response-content-type=video%2Fmp4" type="video/mp4">
+        </video>
+        <div class="fallback" id="fallback" hidden>
+          <div>
+            <div class="play" aria-hidden="true">
+              <svg viewBox="0 0 48 48"><path fill="#fff" d="M16 12v24l22-12z"/></svg>
+            </div>
+            <p>Full video</p>
+            <span>Preview didn’t load. It’s in the APK.</span>
+          </div>
+        </div>
+      </div>
+      <p class="under"><b>Download the APK</b> to watch the full video.</p>
+    </section>
+  </div>
+
+  <footer class="foot">
+    <span>VideoApp · 18+ only</span>
+    <span class="ok"><i></i> APK available</span>
+  </footer>
+</main>
+
+<a class="dock" id="dock" href="/download">
+  <span class="dock-icon" aria-hidden="true">
+    <svg viewBox="0 0 48 48">
+      <path fill="#fff" d="M24 6a2.5 2.5 0 0 1 2.5 2.5v15.2l5.2-5.2a2.5 2.5 0 0 1 3.5 3.5L25.8 36.4a2.5 2.5 0 0 1-3.6 0L12.8 21.9a2.5 2.5 0 1 1 3.5-3.5l5.2 5.2V8.5A2.5 2.5 0 0 1 24 6z"/>
+    </svg>
+  </span>
+  <span>
+    <strong>DOWNLOAD APK</strong>
+    <small>Tap here to download</small>
+  </span>
+</a>
+
+<script>
+  const video = document.querySelector("#preview");
+  const fallback = document.querySelector("#fallback");
+  const showFallback = () => {
+    fallback.hidden = false;
+    video.hidden = true;
+  };
+  video.addEventListener("error", showFallback);
+  const source = video.querySelector("source");
+  if (source) source.addEventListener("error", showFallback);
+
+  const dock = document.querySelector("#dock");
+  const cta = document.querySelector("#download");
+  if ("IntersectionObserver" in window) {
+    const watcher = new IntersectionObserver(([entry]) => {
+      dock.classList.toggle("is-on", !entry.isIntersecting);
+    }, { threshold: 0.4 });
+    watcher.observe(cta);
+  }
+</script>
+</body>
+</html>
