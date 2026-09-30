@@ -17,7 +17,7 @@
       radial-gradient(circle at top,#3a0c16 0%,#14060b 48%,#070203 100%);
     color:#fff;
   }
-  .wrap{width:100%;max-width:560px;margin:0 auto;padding:28px 16px 48px}
+  .wrap{width:100%;max-width:680px;margin:0 auto;padding:28px 16px 48px}
   h1{font-size:26px;margin:0 0 4px;letter-spacing:-.4px}
   .sub{color:#e7b7c2;font-size:13px;margin-bottom:18px}
   .card{border:1px solid rgba(255,90,110,.28);border-radius:18px;
@@ -65,6 +65,16 @@
   input[type=file]{width:100%;margin-bottom:12px;font-size:13px;color:#f3d5dc}
   .choice{display:grid;grid-template-columns:1fr 1fr;gap:12px}
   .choice h3{margin:0 0 8px;font-size:12px;letter-spacing:1px;color:#fff}
+  .nav{display:flex;gap:8px;margin:0 0 16px;overflow-x:auto;position:sticky;top:0;z-index:5;
+    padding:10px 0 12px;background:linear-gradient(#14060b 78%,rgba(20,6,11,0))}
+  .nav button{flex:none;border:1px solid rgba(255,90,110,.32);background:rgba(255,255,255,.04);
+    color:#f6d5dc;border-radius:999px;padding:9px 14px;cursor:pointer;
+    font:700 13px Outfit,Arial,sans-serif}
+  .nav button.is-on{color:#fff;border-color:transparent;background:linear-gradient(135deg,#ff1744,#ff006e)}
+  .block{margin:0 0 14px;padding:14px 12px 4px;border-radius:14px;
+    background:rgba(0,0,0,.22);border:1px solid rgba(255,255,255,.07)}
+  .block-title{margin:0 0 12px;font-size:12px;letter-spacing:1.2px;color:#fff}
+  input[type=file]{padding:10px;border-radius:12px;border:1px dashed rgba(255,140,160,.45);background:#16080c}
   @media (max-width:640px){.choice{grid-template-columns:1fr}}
   [hidden]{display:none!important}
 </style>
@@ -91,46 +101,61 @@
     <div class="sub">Manage the APK, the video playlist, and the words on the page. Customers see the next video each time they open the page, and another video each time they tap the player.</div>
     <div class="stamp" id="stamp">Last saved: never</div>
 
-    <div class="card">
-      <h2>APK DOWNLOAD</h2>
+    <nav class="nav" aria-label="Admin sections">
+      <button type="button" data-section="apk" class="is-on">APK</button>
+      <button type="button" data-section="videos">Videos</button>
+      <button type="button" data-section="words">Page text</button>
+      <button type="button" data-section="security">Password</button>
+    </nav>
+
+    <div class="card" data-panel="apk">
+      <h2>1 · APK DOWNLOAD</h2>
       <p class="hint">Use a link or upload the APK file. The choice you save last is the one customers download.</p>
-      <label>ACTIVE NOW</label>
-      <div class="current" id="curApk">Not set — the button uses /download</div>
+      <div class="block">
+        <h3 class="block-title">ACTIVE FILE</h3>
+        <div class="current" id="curApk">Not set — the button uses /download</div>
+      </div>
       <div class="choice">
-        <div>
-          <h3>LINK</h3>
+        <div class="block">
+          <h3 class="block-title">LINK</h3>
           <label>APK URL</label>
           <input type="url" id="newApk" placeholder="https://…/app.apk" inputmode="url">
           <button class="btn" id="saveApk">Save APK Link</button>
         </div>
-        <div>
-          <h3>UPLOAD</h3>
+        <div class="block">
+          <h3 class="block-title">UPLOAD</h3>
           <label>APK FILE</label>
           <input type="file" id="apkFile" accept=".apk,application/vnd.android.package-archive">
           <button class="btn" id="uploadApk">Upload APK</button>
         </div>
       </div>
-      <label>PEOPLE WHO DOWNLOADED</label>
-      <input type="number" id="downloadBase" min="0" step="1" inputmode="numeric" placeholder="4793">
-      <p class="hint">This number starts at 4,793 and goes up by 1 on every download. Saving here sets a new total. Leave it empty to put it back to 4,793.</p>
-      <button class="btn" id="saveCount">Save Download Count</button>
+      <div class="block">
+        <h3 class="block-title">DOWNLOAD COUNT</h3>
+        <label>PEOPLE WHO DOWNLOADED</label>
+        <input type="number" id="downloadBase" min="0" step="1" inputmode="numeric" placeholder="4793">
+        <p class="hint">Starts at 4,793 and goes up by 1 on every download. Leave it empty to put it back to 4,793.</p>
+        <button class="btn" id="saveCount">Save Download Count</button>
+      </div>
     </div>
 
-    <div class="card">
-      <h2>VIDEOS</h2>
-      <p class="hint">Add a link, upload a file, or both. Add as many as you want. Each new visit starts on the next video. If a customer taps the player, the next video starts.</p>
-      <div id="videoList" class="plist"></div>
-      <p class="empty" id="videoEmpty">No videos yet. The page keeps its built-in preview until you add one.</p>
-      <video class="preview" id="vidPreview" controls playsinline muted hidden></video>
+    <div class="card" data-panel="videos" hidden>
+      <h2>2 · VIDEOS</h2>
+      <p class="hint">Add a link, upload a file, or both. Each new visit starts on the next video. A tap on the player starts the one after that.</p>
+      <div class="block">
+        <h3 class="block-title">PLAYLIST</h3>
+        <div id="videoList" class="plist"></div>
+        <p class="empty" id="videoEmpty">No videos yet. The page keeps its built-in preview until you add one.</p>
+        <video class="preview" id="vidPreview" controls playsinline muted hidden></video>
+      </div>
       <div class="choice">
-        <div>
-          <h3>LINK</h3>
+        <div class="block">
+          <h3 class="block-title">LINK</h3>
           <label>VIDEO URL</label>
           <input type="url" id="newVid" placeholder="https://…/video.mp4" inputmode="url">
           <button class="btn" id="saveVid">Add Video Link</button>
         </div>
-        <div>
-          <h3>UPLOAD</h3>
+        <div class="block">
+          <h3 class="block-title">UPLOAD</h3>
           <label>VIDEO FILE</label>
           <input type="file" id="videoFile" accept="video/mp4,video/webm,video/ogg,.mp4,.webm,.ogg,.mov,.m4v">
           <button class="btn" id="uploadVid">Upload Video</button>
@@ -138,54 +163,69 @@
       </div>
     </div>
 
-    <div class="card">
-      <h2>PAGE TEXT</h2>
-      <p class="hint">Each box already shows the words on the page. Edit them and save. Clear a box and save to restore the original line.</p>
+    <div class="card" data-panel="words" hidden>
+      <h2>3 · PAGE TEXT</h2>
+      <p class="hint">Each box already shows the words on the page. Edit a section and save. Clear a box and save to restore the original line.</p>
 
-      <label>LOGO — FIRST WORD</label>
-      <input type="text" id="logoName" placeholder="Video">
+      <div class="block">
+        <h3 class="block-title">LOGO</h3>
+        <label>FIRST WORD</label>
+        <input type="text" id="logoName" placeholder="Video">
+        <label>SECOND WORD</label>
+        <input type="text" id="logoAccent" placeholder="App">
+      </div>
 
-      <label>LOGO — SECOND WORD</label>
-      <input type="text" id="logoAccent" placeholder="App">
+      <div class="block">
+        <h3 class="block-title">SUBTITLE</h3>
+        <label>LINE UNDER THE LOGO</label>
+        <input type="text" id="subtitle" placeholder="Watch the preview & download the app">
+      </div>
 
-      <label>SUBTITLE</label>
-      <input type="text" id="subtitle" placeholder="Watch the preview & download the app">
+      <div class="block">
+        <h3 class="block-title">VIDEO</h3>
+        <label>SHORT LINE</label>
+        <input type="text" id="hotLabel" placeholder="HOT 🔥">
+        <label>MAIN LINE</label>
+        <input type="text" id="watchLine" placeholder="Download APK to watch FULL video">
+      </div>
 
-      <label>SHORT LINE ON THE VIDEO (HOT)</label>
-      <input type="text" id="hotLabel" placeholder="HOT 🔥">
+      <div class="block">
+        <h3 class="block-title">DOWNLOAD BUTTON</h3>
+        <label>BUTTON</label>
+        <input type="text" id="dlMain" placeholder="DOWNLOAD APK 🔥">
+        <label>SMALL LINE UNDER THE BUTTON</label>
+        <input type="text" id="dlSmall" placeholder="Tap here to download 👇">
+      </div>
 
-      <label>MAIN LINE ON THE VIDEO</label>
-      <input type="text" id="watchLine" placeholder="Download APK to watch FULL video">
+      <div class="block">
+        <h3 class="block-title">INFO CARD</h3>
+        <label>TITLE</label>
+        <input type="text" id="infoTitle" placeholder="40,000+ Hot Videos">
+        <label>TEXT</label>
+        <textarea id="infoText" placeholder="Download the app to unlock the full collection — no ads."></textarea>
+      </div>
 
-      <label>DOWNLOAD BUTTON</label>
-      <input type="text" id="dlMain" placeholder="DOWNLOAD APK 🔥">
-
-      <label>SMALL LINE UNDER THE BUTTON</label>
-      <input type="text" id="dlSmall" placeholder="Tap here to download 👇">
-
-      <label>INFO CARD TITLE</label>
-      <input type="text" id="infoTitle" placeholder="40,000+ Hot Videos">
-
-      <label>INFO CARD TEXT</label>
-      <textarea id="infoText" placeholder="Download the app to unlock the full collection — no ads."></textarea>
-
-      <label>FOOTER</label>
-      <input type="text" id="footText" placeholder="VideoApp · 18+ only">
-
-      <label class="check"><input type="checkbox" id="show18" checked> Show 18+ badges (logo and footer)</label>
+      <div class="block">
+        <h3 class="block-title">FOOTER</h3>
+        <label>FOOTER LINE</label>
+        <input type="text" id="footText" placeholder="VideoApp · 18+ only">
+        <label class="check"><input type="checkbox" id="show18" checked> Show 18+ badges on the logo and footer</label>
+      </div>
       <button class="btn" id="saveText">Save Page Text</button>
     </div>
 
-    <div class="card">
-      <h2>CHANGE PASSWORD</h2>
+    <div class="card" data-panel="security" hidden>
+      <h2>4 · PASSWORD</h2>
       <p class="hint">The password is Test123 until you change it here. Reset does not change the password.</p>
-      <label>CURRENT PASSWORD</label>
-      <input type="password" id="oldPass" autocomplete="off">
-      <label>NEW PASSWORD</label>
-      <input type="password" id="newPass" autocomplete="new-password" placeholder="At least 4 characters">
-      <label>CONFIRM NEW PASSWORD</label>
-      <input type="password" id="confirmPass" autocomplete="new-password">
-      <button class="btn" id="savePass">Update Password</button>
+      <div class="block">
+        <label>CURRENT PASSWORD</label>
+        <input type="password" id="oldPass" autocomplete="off">
+        <label>NEW PASSWORD</label>
+        <input type="password" id="newPass" autocomplete="new-password" placeholder="At least 4 characters">
+        <label>CONFIRM NEW PASSWORD</label>
+        <input type="password" id="confirmPass" autocomplete="new-password">
+        <button class="btn" id="savePass">Update Password</button>
+      </div>
     </div>
 
     <div class="ok" id="msg"></div>
@@ -463,6 +503,18 @@
       gateErr.textContent = "Wrong password.";
     }
   }
+  document.querySelectorAll("[data-section]").forEach(function (btn) {
+    btn.onclick = function () {
+      var name = btn.getAttribute("data-section");
+      document.querySelectorAll("[data-section]").forEach(function (item) {
+        item.classList.toggle("is-on", item === btn);
+      });
+      document.querySelectorAll("[data-panel]").forEach(function (panelEl) {
+        panelEl.hidden = panelEl.getAttribute("data-panel") !== name;
+      });
+    };
+  });
+
   document.getElementById("loginBtn").onclick = unlock;
   pw.addEventListener("keydown", function (e) { if (e.key === "Enter") unlock(); });
 
