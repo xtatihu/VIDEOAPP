@@ -124,6 +124,13 @@
   }
   .download .ic{width:22px;height:22px}
   .download-small{display:block;width:100%;margin-top:4px;font-size:12.5px;font-weight:400;opacity:.85}
+  .dl-stat{margin-top:12px;display:flex;align-items:center;justify-content:center;gap:10px;
+    padding:11px 14px;border-radius:16px;
+    background:rgba(255,255,255,.06);border:1px solid rgba(255,140,160,.32);
+    box-shadow:inset 0 1px 0 rgba(255,200,210,.16)}
+  .dl-stat-num{font-size:26px;font-weight:800;letter-spacing:-.6px;color:#fff;
+    text-shadow:0 6px 16px rgba(255,40,70,.45)}
+  .dl-stat-label{font-size:12.5px;line-height:1.25;color:#f6c9d2;text-align:left;max-width:150px}
 
   .info{margin-top:20px;padding:18px;border:1px solid rgba(255,90,110,.28);border-radius:22px;
     background:linear-gradient(180deg,rgba(255,40,70,.14),rgba(255,255,255,.03));
@@ -223,6 +230,10 @@
     <svg class="ic"><use href="#i-download"/></svg> <span id="dlMain" data-default="DOWNLOAD APK 🔥">DOWNLOAD APK 🔥</span>
     <span class="download-small" id="dlSmall" data-default="Tap here to download 👇">Tap here to download 👇</span>
   </a>
+  <div class="dl-stat" id="dlStat">
+    <span class="dl-stat-num" id="dlNum">4,793</span>
+    <span class="dl-stat-label">people downloaded this APK</span>
+  </div>
 
   <div class="info">
     <div class="info-title" id="infoTitle" data-default="🔞 40,000+ Hot Videos 🔥🥵😈">🔞 40,000+ Hot Videos 🔥🥵😈</div>
@@ -242,6 +253,7 @@
   var video = document.getElementById("preview");
   var mirror = document.getElementById("mirror");
   var download = document.getElementById("download");
+  var DEFAULT_COUNT = 4793;
 
   function read(key) {
     try { return localStorage.getItem(key); } catch (e) { return null; }
@@ -260,6 +272,14 @@
     }
     if (download.getAttribute("href") !== nextApk) download.setAttribute("href", nextApk);
     applyCopy();
+    paintCount();
+  }
+
+  function paintCount() {
+    var raw = parseInt(read("download_base"), 10);
+    var total = isFinite(raw) && raw >= 0 ? raw : DEFAULT_COUNT;
+    var num = document.getElementById("dlNum");
+    if (num) num.textContent = String(total).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
   }
 
   function applyCopy() {
