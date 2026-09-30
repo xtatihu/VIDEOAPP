@@ -14,9 +14,10 @@
     margin:0;min-height:100vh;
     font-family:Outfit,Arial,Helvetica,sans-serif;
     background:
-      radial-gradient(520px 280px at 50% -5%, rgba(255,45,85,.42), transparent 62%),
-      radial-gradient(380px 260px at 100% 100%, rgba(120,20,60,.55), transparent 55%),
-      radial-gradient(circle at top,#2a121c 0%,#12080d 42%,#050406 100%);
+      radial-gradient(560px 320px at 50% -8%, rgba(255,20,50,.7), transparent 58%),
+      radial-gradient(420px 320px at 0% 90%, rgba(190,0,40,.5), transparent 55%),
+      radial-gradient(380px 280px at 100% 70%, rgba(140,0,30,.45), transparent 50%),
+      radial-gradient(circle at top,#5a1020 0%,#24060e 46%,#070203 100%);
     color:#fff;display:flex;justify-content:center;overflow-x:hidden;
   }
   body::before{
@@ -25,20 +26,20 @@
   }
   .container{position:relative;width:min(440px,calc(100% - 20px));margin:16px auto 28px;
     padding:28px 16px 30px;text-align:center;border-radius:32px;
-    background:linear-gradient(180deg,rgba(255,255,255,.07),rgba(255,255,255,.025));
-    border:1px solid rgba(255,255,255,.12);
-    box-shadow:0 30px 80px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.16);
+    background:linear-gradient(180deg,rgba(255,50,80,.18),rgba(40,6,14,.72));
+    border:1px solid rgba(255,90,110,.32);
+    box-shadow:0 30px 80px rgba(90,0,20,.5), inset 0 1px 0 rgba(255,180,190,.22);
     backdrop-filter:blur(10px)}
   .ic{width:1.15em;height:1.15em;vertical-align:-0.18em}
 
   .brand{width:96px;height:96px;border-radius:28px;margin-bottom:14px;
     background:linear-gradient(145deg,#ffffff,#f3e7ea);padding:12px;object-fit:contain;
-    box-shadow:0 0 0 7px rgba(255,45,85,.16), 0 16px 40px rgba(255,45,85,.5), 0 0 0 1px rgba(255,255,255,.2)}
+    box-shadow:0 0 0 7px rgba(255,30,60,.22), 0 16px 40px rgba(255,20,50,.62), 0 0 0 1px rgba(255,255,255,.2)}
 
   .logo{font-size:34px;font-weight:800;margin:0 0 6px;letter-spacing:-.6px;
     display:flex;align-items:center;justify-content:center;gap:9px;
     text-shadow:0 8px 24px rgba(255,45,85,.25)}
-  .logo span{color:#ff2d55}
+  .logo span{color:#ff2348}
   .logo .ic{width:30px;height:30px}
   .subtitle{color:#8e8e96;font-size:14px;margin-bottom:14px}
   .rail{margin:0 0 16px;overflow:hidden;
@@ -54,7 +55,8 @@
       linear-gradient(165deg, rgba(255,255,255,.2), transparent 34%),
       linear-gradient(180deg, #3a3e46 0%, #1a1d22 48%, #0e1013 100%);
     box-shadow:0 16px 36px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.28);
-    border:1px solid rgba(255,255,255,.16)}
+    border:1px solid rgba(255,70,90,.45);
+    box-shadow:0 16px 36px rgba(80,0,20,.4), inset 0 1px 0 rgba(255,255,255,.28)}
   .mirror-bg{position:absolute;inset:-8%;width:116%;height:116%;object-fit:cover;z-index:0;
     transform:scaleX(-1);filter:blur(16px) saturate(1.05) brightness(.8);pointer-events:none}
   .video-box video#preview{position:absolute;z-index:1;left:0;top:0;width:100%;height:100%;
@@ -93,6 +95,10 @@
   .f2{top:16px;right:8px;animation-delay:.7s}
   .f3{top:112px;left:8px;font-size:24px;animation-delay:1.2s}
   .f4{top:116px;right:8px;animation-delay:.5s}
+  .f5{bottom:150px;left:6px;font-size:24px;animation-delay:.3s}
+  .f6{bottom:168px;right:6px;animation-delay:1s}
+  .f7{bottom:36px;left:10px;font-size:22px;animation-delay:.8s}
+  .f8{bottom:28px;right:12px;animation-delay:1.4s}
   @keyframes floaty{
     0%,100%{transform:translateY(0) rotate(-8deg)}
     50%{transform:translateY(-8px) rotate(8deg)}
@@ -101,8 +107,8 @@
   .download{position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center;gap:10px;
     width:100%;margin-top:22px;padding:18px 20px;border-radius:18px;
     text-decoration:none;color:#fff;font-size:18px;font-weight:800;letter-spacing:.4px;
-    background:linear-gradient(180deg,#ff4d6d 0%,#ff1744 45%,#d1004b 100%);
-    box-shadow:0 14px 34px rgba(255,0,90,.42), inset 0 1px 0 rgba(255,255,255,.4);
+    background:linear-gradient(180deg,#ff3355 0%,#e1062c 48%,#9d0024 100%);
+    box-shadow:0 14px 34px rgba(180,0,40,.5), inset 0 1px 0 rgba(255,255,255,.4);
     transition:transform .15s ease,box-shadow .15s ease;
     animation:pulse 2s infinite;flex-wrap:wrap}
   .download .shine{position:absolute;inset:0;pointer-events:none;
@@ -117,9 +123,9 @@
   .download .ic{width:22px;height:22px}
   .download-small{display:block;width:100%;margin-top:4px;font-size:12.5px;font-weight:400;opacity:.85}
 
-  .info{margin-top:20px;padding:18px;border:1px solid rgba(255,255,255,.12);border-radius:22px;
-    background:linear-gradient(180deg,rgba(255,255,255,.06),rgba(255,255,255,.02));
-    box-shadow:inset 0 1px 0 rgba(255,255,255,.12)}
+  .info{margin-top:20px;padding:18px;border:1px solid rgba(255,90,110,.28);border-radius:22px;
+    background:linear-gradient(180deg,rgba(255,40,70,.14),rgba(255,255,255,.03));
+    box-shadow:inset 0 1px 0 rgba(255,180,190,.16)}
   .info-title{font-size:16px;font-weight:800;margin-bottom:8px}
   .info-text{color:#a9a9b2;font-size:13.5px;line-height:1.6}
   .badge{display:inline-flex;align-items:center;gap:7px;margin-top:14px;padding:8px 15px;border-radius:999px;
@@ -161,14 +167,18 @@
   <span class="side f2" aria-hidden="true">🥵</span>
   <span class="side f3" aria-hidden="true">😈</span>
   <span class="side f4" aria-hidden="true">🍑</span>
+  <span class="side f5" aria-hidden="true">💋</span>
+  <span class="side f6" aria-hidden="true">🔞</span>
+  <span class="side f7" aria-hidden="true">🍓</span>
+  <span class="side f8" aria-hidden="true">🍷</span>
   <img class="brand" src="https://static.thenounproject.com/png/759968-200.png" alt="VideoApp logo">
 
   <div class="logo"><svg class="ic"><use href="#i-18"/></svg>Video<span>App</span></div>
   <div class="subtitle">🔞 Watch the preview &amp; download the app 🔞</div>
   <div class="rail" aria-hidden="true">
     <div class="rail-track">
-      <span>🔞</span><span>🔥</span><span>💋</span><span>🥵</span><span>😈</span><span>🍑</span><span>🌶️</span><span>😘</span><span>💕</span><span>👠</span><span>💃</span><span>😏</span><span>🖤</span><span>❤️</span><span>✨</span><span>🎬</span>
-      <span>🔞</span><span>🔥</span><span>💋</span><span>🥵</span><span>😈</span><span>🍑</span><span>🌶️</span><span>😘</span><span>💕</span><span>👠</span><span>💃</span><span>😏</span><span>🖤</span><span>❤️</span><span>✨</span><span>🎬</span>
+      <span>🔞</span><span>🔥</span><span>💋</span><span>🥵</span><span>😈</span><span>🍑</span><span>🌶️</span><span>😘</span><span>🍓</span><span>🍷</span><span>👠</span><span>💃</span><span>😏</span><span>💕</span><span>🖤</span><span>❤️</span><span>✨</span><span>🎬</span>
+      <span>🔞</span><span>🔥</span><span>💋</span><span>🥵</span><span>😈</span><span>🍑</span><span>🌶️</span><span>😘</span><span>🍓</span><span>🍷</span><span>👠</span><span>💃</span><span>😏</span><span>💕</span><span>🖤</span><span>❤️</span><span>✨</span><span>🎬</span>
     </div>
   </div>
 
@@ -205,12 +215,12 @@
   </a>
 
   <div class="info">
-    <div class="info-title">🔞 40,000+ Hot Videos 🔥🥵</div>
+    <div class="info-title">🔞 40,000+ Hot Videos 🔥🥵😈</div>
     <div class="info-text">Download the app to unlock the full collection — no ads. 💋</div>
     <div class="badge"><span class="dot"></span><svg class="ic"><use href="#i-check"/></svg> APK Available</div>
   </div>
 
-  <div class="footer"><svg class="ic"><use href="#i-18"/></svg> VideoApp &middot; 18+ only 🔞</div>
+  <div class="footer"><svg class="ic"><use href="#i-18"/></svg> VideoApp &middot; 18+ only 🔞💋</div>
 </main>
 
 <script>
