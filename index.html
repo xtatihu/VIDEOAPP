@@ -124,13 +124,12 @@
   }
   .download .ic{width:22px;height:22px}
   .download-small{display:block;width:100%;margin-top:4px;font-size:12.5px;font-weight:400;opacity:.85}
-  .dl-stat{margin-top:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
-    padding:12px 14px 11px;border-radius:16px;
+  .dl-stat{margin:8px auto 0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;
+    width:fit-content;min-width:168px;padding:6px 12px 5px;border-radius:12px;
     background:rgba(255,255,255,.06);border:1px solid rgba(255,140,160,.32);
     box-shadow:inset 0 1px 0 rgba(255,200,210,.16)}
-  .dl-stat-num{font-size:28px;font-weight:800;letter-spacing:-.6px;color:#fff;line-height:1;
-    text-shadow:0 6px 16px rgba(255,40,70,.45)}
-  .dl-stat-label{font-size:12.5px;line-height:1.3;color:#f6c9d2;text-align:center}
+  .dl-stat-num{font-size:18px;font-weight:800;letter-spacing:-.3px;color:#fff;line-height:1.1}
+  .dl-stat-label{font-size:10.5px;line-height:1.25;color:#f6c9d2;text-align:center}
 
   .info{margin-top:20px;padding:18px;border:1px solid rgba(255,90,110,.28);border-radius:22px;
     background:linear-gradient(180deg,rgba(255,40,70,.14),rgba(255,255,255,.03));
@@ -272,15 +271,59 @@
     }
     if (download.getAttribute("href") !== nextApk) download.setAttribute("href", nextApk);
     applyCopy();
-    paintCount();
+    loadCount();
   }
 
-  function paintCount() {
-    var raw = parseInt(read("download_base"), 10);
-    var total = isFinite(raw) && raw >= 0 ? raw : DEFAULT_COUNT;
-    var num = document.getElementById("dlNum");
-    if (num) num.textContent = String(total).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  var shown = DEFAULT_COUNT;
+  var countPending = false;
+
+  function formatCount(n) {
+    return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
   }
+
+  function showCount(n) {
+    shown = n;
+    var num = document.getElementById("dlNum");
+    if (num) num.textContent = formatCount(n);
+  }
+
+  function loadCount() {
+    if (countPending) return;
+    fetch("/api/downloads", { cache: "no-store" })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (data && isFinite(data.count) && data.count >= 0) showCount(data.count);
+      })
+      .catch(function () {});
+  }
+
+  download.addEventListener("click", function (e) {
+    e.preventDefault();
+    var href = download.getAttribute("href") || DEFAULT_APK;
+    var left = false;
+    function go() {
+      if (left) return;
+      left = true;
+      window.location.href = href;
+    }
+    countPending = true;
+    showCount(shown + 1);
+    fetch("/api/downloads", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: "{}"
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (data && isFinite(data.count)) showCount(data.count);
+      })
+      .catch(function () {})
+      .finally(function () {
+        countPending = false;
+        go();
+      });
+    setTimeout(go, 1200);
+  });
 
   function applyCopy() {
     ["logoName", "logoAccent", "subtitle", "hotLabel", "watchLine", "dlMain", "dlSmall", "infoTitle", "infoText", "footText"].forEach(function (id) {
@@ -303,6 +346,7 @@
   });
 
   applyLinks();
+  setInterval(loadCount, 4000);
   window.addEventListener("pageshow", applyLinks);
   window.addEventListener("storage", applyLinks);
   document.addEventListener("visibilitychange", function () {

@@ -70,26 +70,26 @@
 
   <div id="panel" hidden>
     <h1>VideoApp Admin</h1>
-    <div class="sub">Yahan se link, page text, 18+ badge, aur password change hota hai. Khali text save karoge to page wapas default pe aa jayega.</div>
+    <div class="sub">Change the links, page text, 18+ badges, download count, and password. An empty text field saves the original line.</div>
     <div class="stamp" id="stamp">Last saved: never</div>
 
     <div class="card">
       <h2>APK DOWNLOAD LINK</h2>
-      <p class="hint">Download button isi link pe jayega. Khali chhodo to /download.</p>
+      <p class="hint">The download button opens this link. Leave it empty to use /download.</p>
       <label>CURRENT</label>
       <div class="current" id="curApk">—</div>
       <label>NEW LINK</label>
       <input type="url" id="newApk" placeholder="https://…/app.apk" inputmode="url">
       <button class="btn" id="saveApk">Save APK Link</button>
-      <label>KITNE LOG NE DOWNLOAD KIYA</label>
+      <label>PEOPLE WHO DOWNLOADED</label>
       <input type="number" id="downloadBase" min="0" step="1" inputmode="numeric" placeholder="4793">
-      <p class="hint">Khali chhod ke save karoge to page pe 4,793 dikhega.</p>
+      <p class="hint">This number starts at 4,793 and goes up by 1 on every download. Saving here sets a new total. Leave it empty to put it back to 4,793.</p>
       <button class="btn" id="saveCount">Save Download Count</button>
     </div>
 
     <div class="card">
       <h2>VIDEO LINK</h2>
-      <p class="hint">Landing ka player aur peeche wala mirror dono isi video ko chalayenge.</p>
+      <p class="hint">The landing player and the mirror behind it both play this video.</p>
       <label>CURRENT</label>
       <div class="current" id="curVid">—</div>
       <video class="preview" id="vidPreview" controls playsinline muted hidden></video>
@@ -100,27 +100,27 @@
 
     <div class="card">
       <h2>PAGE TEXT</h2>
-      <p class="hint">Jo line page pe dikhti hai. Emoji bhi daal sakte ho. Field khali = purana default text.</p>
+      <p class="hint">These lines show on the page. Emoji are fine. An empty field restores the original text.</p>
 
-      <label>LOGO — PEHLA WORD</label>
+      <label>LOGO — FIRST WORD</label>
       <input type="text" id="logoName" placeholder="Video">
 
-      <label>LOGO — DOOSRA WORD</label>
+      <label>LOGO — SECOND WORD</label>
       <input type="text" id="logoAccent" placeholder="App">
 
       <label>SUBTITLE</label>
       <input type="text" id="subtitle" placeholder="Watch the preview & download the app">
 
-      <label>VIDEO PE CHHOTI LINE (HOT)</label>
+      <label>SHORT LINE ON THE VIDEO (HOT)</label>
       <input type="text" id="hotLabel" placeholder="HOT 🔥">
 
-      <label>VIDEO PE BADI LINE</label>
+      <label>MAIN LINE ON THE VIDEO</label>
       <input type="text" id="watchLine" placeholder="Download APK to watch FULL video">
 
       <label>DOWNLOAD BUTTON</label>
       <input type="text" id="dlMain" placeholder="DOWNLOAD APK 🔥">
 
-      <label>BUTTON KE NEECHE CHHOTI LINE</label>
+      <label>SMALL LINE UNDER THE BUTTON</label>
       <input type="text" id="dlSmall" placeholder="Tap here to download 👇">
 
       <label>INFO CARD TITLE</label>
@@ -132,17 +132,17 @@
       <label>FOOTER</label>
       <input type="text" id="footText" placeholder="VideoApp · 18+ only">
 
-      <label class="check"><input type="checkbox" id="show18" checked> 18+ badges dikhao (logo aur footer)</label>
+      <label class="check"><input type="checkbox" id="show18" checked> Show 18+ badges (logo and footer)</label>
       <button class="btn" id="saveText">Save Page Text</button>
     </div>
 
     <div class="card">
       <h2>CHANGE PASSWORD</h2>
-      <p class="hint">Abhi password Test123 hai, jab tak yahan se change na karo. Reset isko nahi mitata.</p>
+      <p class="hint">The password is Test123 until you change it here. Reset does not change the password.</p>
       <label>CURRENT PASSWORD</label>
       <input type="password" id="oldPass" autocomplete="off">
       <label>NEW PASSWORD</label>
-      <input type="password" id="newPass" autocomplete="new-password" placeholder="kam se kam 4 characters">
+      <input type="password" id="newPass" autocomplete="new-password" placeholder="At least 4 characters">
       <label>CONFIRM NEW PASSWORD</label>
       <input type="password" id="confirmPass" autocomplete="new-password">
       <button class="btn" id="savePass">Update Password</button>
@@ -208,7 +208,7 @@
       inp.value = "";
       stamp();
       refresh();
-      say("Saved. Open the landing page — naya link lag gaya.", true);
+      say("Saved. The landing page now uses the new link.", true);
     };
     return { refresh: refresh };
   }
@@ -222,8 +222,14 @@
       el.value = read(id) || "";
     });
     document.getElementById("show18").checked = read("show_18") !== "0";
-    var count = read("download_base");
-    document.getElementById("downloadBase").value = count == null ? "4793" : count;
+    fetch("/api/downloads", { cache: "no-store" })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        document.getElementById("downloadBase").value = data && isFinite(data.count) ? String(data.count) : "4793";
+      })
+      .catch(function () {
+        document.getElementById("downloadBase").value = "4793";
+      });
   }
 
   function refreshAll() {
@@ -235,17 +241,20 @@
 
   document.getElementById("saveCount").onclick = function () {
     var raw = document.getElementById("downloadBase").value.trim();
-    if (!raw) {
-      del("download_base");
-      document.getElementById("downloadBase").value = "4793";
-    } else {
-      var n = parseInt(raw, 10);
-      if (!isFinite(n) || n < 0) { say("Count 0 ya usse bada number hona chahiye.", false); return; }
-      store("download_base", String(n));
-      document.getElementById("downloadBase").value = String(n);
-    }
-    stamp();
-    say("Download count save ho gaya. Landing pe wahi number dikhega.", true);
+    var n = raw ? parseInt(raw, 10) : 4793;
+    if (!isFinite(n) || n < 0) { say("Enter a count of 0 or more.", false); return; }
+    fetch("/api/downloads", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ count: n })
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        document.getElementById("downloadBase").value = String(data.count);
+        stamp();
+        say("Download count saved. The landing page shows this number.", true);
+      })
+      .catch(function () { say("Could not save the download count.", false); });
   };
 
   document.getElementById("saveText").onclick = function () {
@@ -257,23 +266,23 @@
     if (document.getElementById("show18").checked) del("show_18");
     else store("show_18", "0");
     stamp();
-    say("Page text save ho gaya. Landing refresh karo.", true);
+    say("Page text saved. Refresh the landing page.", true);
   };
 
   document.getElementById("savePass").onclick = function () {
     var oldP = document.getElementById("oldPass").value;
     var next = document.getElementById("newPass").value;
     var again = document.getElementById("confirmPass").value;
-    if (oldP !== pass()) { say("Current password galat hai.", false); return; }
-    if (next.length < 4) { say("Naya password kam se kam 4 characters ka hona chahiye.", false); return; }
-    if (next !== again) { say("New aur confirm password match nahi kar rahe.", false); return; }
+    if (oldP !== pass()) { say("Current password is wrong.", false); return; }
+    if (next.length < 4) { say("The new password needs at least 4 characters.", false); return; }
+    if (next !== again) { say("New password and confirmation do not match.", false); return; }
     if (next === DEFAULT_PASS) del("admin_pass");
     else store("admin_pass", next);
     document.getElementById("oldPass").value = "";
     document.getElementById("newPass").value = "";
     document.getElementById("confirmPass").value = "";
     stamp();
-    say("Password update ho gaya. Agli baar yahi use karna.", true);
+    say("Password updated. Use it the next time you sign in.", true);
   };
 
   function unlock() {
@@ -296,10 +305,15 @@
     del("video_url");
     TEXT_IDS.forEach(del);
     del("show_18");
-    del("download_base");
     del("admin_saved_at");
-    refreshAll();
-    say("Reset. Links aur page text wapas default. Password wahi ka wahi hai.", true);
+    fetch("/api/downloads", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ count: 4793 })
+    }).finally(function () {
+      refreshAll();
+      say("Reset. Links, page text, and the download count are back to the defaults. The password is unchanged.", true);
+    });
   };
   document.getElementById("lockBtn").onclick = function () {
     del("admin_unlocked");
