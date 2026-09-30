@@ -17,7 +17,7 @@ export function downloadsApi(root) {
 
   function writeCount(n) {
     fs.mkdirSync(path.dirname(file), { recursive: true });
-    fs.writeFileSync(file, JSON.stringify({ count: n }) + "\n");
+    fs.writeFileSync(file, JSON.stringify({ count: n }, null, 2) + "\n");
   }
 
   function mutate(fn) {
