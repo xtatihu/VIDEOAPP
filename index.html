@@ -584,6 +584,7 @@
       if (!el) return;
       var key = el.getAttribute("data-key");
       var saved = read(key || id);
+      if (id === "dlSmall" && saved === "Tap here to download 👇") saved = "";
       el.textContent = saved || el.getAttribute("data-default") || el.textContent;
     });
     var logoName = document.getElementById("logoName");
