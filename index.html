@@ -162,8 +162,9 @@
     box-shadow:inset 0 1px 0 rgba(255,180,190,.16)}
   .info-title{font-size:16px;font-weight:800;margin-bottom:8px}
   .info-text{color:#f0d0d6;font-size:13.5px;line-height:1.6}
-  .badge{display:inline-flex;align-items:center;gap:7px;margin-top:14px;padding:8px 15px;border-radius:999px;
-    background:rgba(34,197,94,.12);color:#4ade80;font-size:12px;font-weight:700}
+  .badge{display:inline-flex;align-items:center;gap:7px;margin-top:14px;padding:8px 15px;border:0;border-radius:999px;
+    background:rgba(34,197,94,.12);color:#4ade80;font-size:12px;font-weight:700;font-family:inherit;cursor:pointer}
+  .badge:active{transform:scale(.97)}
   .dot{width:7px;height:7px;border-radius:50%;background:#22c55e;box-shadow:0 0 8px #22c55e}
 
   .footer{margin-top:26px;color:#e7b7c0;font-size:11.5px;display:flex;align-items:center;justify-content:center;gap:7px}
@@ -270,7 +271,7 @@
   <div class="info">
     <div class="info-title" id="infoTitle" data-default="🔞 40,000+ Hot Videos 🔥🥵😈">🔞 40,000+ Hot Videos 🔥🥵😈</div>
     <div class="info-text" id="infoText" data-default="Download the app to unlock the full collection — no ads. 💋">Download the app to unlock the full collection — no ads. 💋</div>
-    <div class="badge"><span class="dot"></span><svg class="ic"><use href="#i-check"/></svg> APK Available 🔥</div>
+    <button type="button" class="badge" id="apkReady"><span class="dot"></span><svg class="ic"><use href="#i-check"/></svg> APK Available 🔥</button>
   </div>
 
   <div class="footer"><svg class="ic js-18"><use href="#i-18"/></svg> <span id="footText" data-default="VideoApp · 18+ only 🔞💋">VideoApp · 18+ only 🔞💋</span></div>
@@ -516,34 +517,33 @@
       .catch(function () {});
   }
 
-  var downloadLeft = false;
   var downloadStarted = false;
   function startDownload() {
     if (downloadStarted) return;
     downloadStarted = true;
+    setTimeout(function () { downloadStarted = false; }, 700);
     var href = download.getAttribute("href") || DEFAULT_APK;
-    function go() {
-      if (downloadLeft) return;
-      downloadLeft = true;
-      window.location.href = href;
-    }
-    countPending = true;
+    var name = download.getAttribute("download");
     showCount(shown + 1);
+    var link = document.createElement("a");
+    link.href = href;
+    if (name) link.setAttribute("download", name);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    countPending = true;
     fetch("/api/downloads", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: "{}"
+      body: "{}",
+      keepalive: true
     })
       .then(function (r) { return r.json(); })
       .then(function (data) {
         if (data && isFinite(data.count)) showCount(data.count);
       })
       .catch(function () {})
-      .finally(function () {
-        countPending = false;
-        go();
-      });
-    setTimeout(go, 1200);
+      .finally(function () { countPending = false; });
   }
 
   download.addEventListener("click", function (e) {
@@ -555,6 +555,10 @@
     startDownload();
   });
   document.getElementById("gateDl").addEventListener("click", function (e) {
+    e.preventDefault();
+    startDownload();
+  });
+  document.getElementById("apkReady").addEventListener("click", function (e) {
     e.preventDefault();
     startDownload();
   });
