@@ -136,6 +136,7 @@
 
   .footer{margin-top:26px;color:#e7b7c0;font-size:11.5px;display:flex;align-items:center;justify-content:center;gap:7px}
   .footer .ic{width:26px;height:26px}
+  .is-off{display:none!important}
 
   @media (prefers-reduced-motion: reduce){
     .hot,.arrow,.download,.sticker,.side,.rail-track,.shine,.gem{animation:none}
@@ -175,8 +176,8 @@
   <span class="side f8" aria-hidden="true">🍷</span>
   <img class="brand" src="https://static.thenounproject.com/png/759968-200.png" alt="VideoApp logo">
 
-  <div class="logo"><svg class="ic"><use href="#i-18"/></svg>Video<span>App</span></div>
-  <div class="subtitle">🔞 Watch the preview &amp; download the app 🔞</div>
+  <div class="logo"><svg class="ic js-18"><use href="#i-18"/></svg><span id="logoName" data-default="Video">Video</span><span id="logoAccent" data-default="App">App</span></div>
+  <div class="subtitle" id="subtitle" data-default="🔞 Watch the preview &amp; download the app 🔞">🔞 Watch the preview &amp; download the app 🔞</div>
   <div class="rail" aria-hidden="true">
     <div class="rail-track">
       <span>🔞</span><span>🔥</span><span>💋</span><span>🥵</span><span>😈</span><span>🍑</span><span>🌶️</span><span>😘</span><span>🍓</span><span>🍷</span><span>👠</span><span>💃</span><span>😏</span><span>💕</span><span>🖤</span><span>❤️</span><span>✨</span><span>🎬</span>
@@ -204,8 +205,8 @@
     </video>
     <div class="video-fade"></div>
     <div class="watch-text">
-      <span class="hot">HOT 🔥</span><br>
-      Download APK to watch FULL video
+      <span class="hot" id="hotLabel" data-default="HOT 🔥">HOT 🔥</span><br>
+      <span id="watchLine" data-default="Download APK to watch FULL video">Download APK to watch FULL video</span>
       <svg class="arrow" viewBox="0 0 48 48"><use href="#i-arrowdown"/></svg>
     </div>
   </div>
@@ -219,17 +220,17 @@
 
   <a class="download" id="download" href="/download">
     <span class="shine" aria-hidden="true"></span>
-    <svg class="ic"><use href="#i-download"/></svg> DOWNLOAD APK 🔥
-    <span class="download-small">Tap here to download 👇</span>
+    <svg class="ic"><use href="#i-download"/></svg> <span id="dlMain" data-default="DOWNLOAD APK 🔥">DOWNLOAD APK 🔥</span>
+    <span class="download-small" id="dlSmall" data-default="Tap here to download 👇">Tap here to download 👇</span>
   </a>
 
   <div class="info">
-    <div class="info-title">🔞 40,000+ Hot Videos 🔥🥵😈</div>
-    <div class="info-text">Download the app to unlock the full collection — no ads. 💋</div>
+    <div class="info-title" id="infoTitle" data-default="🔞 40,000+ Hot Videos 🔥🥵😈">🔞 40,000+ Hot Videos 🔥🥵😈</div>
+    <div class="info-text" id="infoText" data-default="Download the app to unlock the full collection — no ads. 💋">Download the app to unlock the full collection — no ads. 💋</div>
     <div class="badge"><span class="dot"></span><svg class="ic"><use href="#i-check"/></svg> APK Available 🔥</div>
   </div>
 
-  <div class="footer"><svg class="ic"><use href="#i-18"/></svg> VideoApp &middot; 18+ only 🔞💋</div>
+  <div class="footer"><svg class="ic js-18"><use href="#i-18"/></svg> <span id="footText" data-default="VideoApp · 18+ only 🔞💋">VideoApp · 18+ only 🔞💋</span></div>
 </main>
 
 <script>
@@ -258,6 +259,21 @@
       mirror.load();
     }
     if (download.getAttribute("href") !== nextApk) download.setAttribute("href", nextApk);
+    applyCopy();
+  }
+
+  function applyCopy() {
+    ["logoName", "logoAccent", "subtitle", "hotLabel", "watchLine", "dlMain", "dlSmall", "infoTitle", "infoText", "footText"].forEach(function (id) {
+      var el = document.getElementById(id);
+      if (!el) return;
+      var key = el.getAttribute("data-key");
+      var saved = read(key || id);
+      el.textContent = saved || el.getAttribute("data-default") || el.textContent;
+    });
+    var show = read("show_18");
+    document.querySelectorAll(".js-18").forEach(function (el) {
+      el.classList.toggle("is-off", show === "0");
+    });
   }
 
   video.addEventListener("play", function () { mirror.play().catch(function () {}); });
@@ -268,9 +284,7 @@
 
   applyLinks();
   window.addEventListener("pageshow", applyLinks);
-  window.addEventListener("storage", function (e) {
-    if (!e.key || e.key === "video_url" || e.key === "apk_url") applyLinks();
-  });
+  window.addEventListener("storage", applyLinks);
   document.addEventListener("visibilitychange", function () {
     if (document.visibilityState === "visible") applyLinks();
   });
