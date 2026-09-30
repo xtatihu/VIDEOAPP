@@ -1,6 +1,6 @@
-import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
+import { openBox } from "./secret-box.js";
 
 const MAX = 500;
 const stores = new Map();
@@ -8,20 +8,19 @@ const stores = new Map();
 export function openHistory(root) {
   if (stores.has(root)) return stores.get(root);
   const file = path.join(root, "data", "history.json");
+  const box = openBox(root);
   let queue = Promise.resolve();
 
   function read() {
-    try {
-      const data = JSON.parse(fs.readFileSync(file, "utf8"));
-      return Array.isArray(data.events) ? data.events : [];
-    } catch (e) {
-      return [];
-    }
+    const loaded = box.readJsonFile(file, { events: [] });
+    if (loaded.error) throw new Error("Could not read history.");
+    const events = Array.isArray(loaded.value) ? loaded.value : (loaded.value && loaded.value.events) || [];
+    if (loaded.plain && !loaded.missing) box.writeJsonFile(file, { events });
+    return events;
   }
 
   function write(events) {
-    fs.mkdirSync(path.dirname(file), { recursive: true });
-    fs.writeFileSync(file, JSON.stringify({ events: events.slice(0, MAX) }, null, 2) + "\n");
+    box.writeJsonFile(file, { events: events.slice(0, MAX) });
   }
 
   function add(entry) {
@@ -42,7 +41,26 @@ export function openHistory(root) {
     return job;
   }
 
-  const api = { add, list: () => read() };
+  function remove(id) {
+    const job = queue.then(() => {
+      const events = read().filter((row) => row.id !== id);
+      write(events);
+      return events;
+    });
+    queue = job.then(() => {}, () => {});
+    return job;
+  }
+
+  function clear() {
+    const job = queue.then(() => {
+      write([]);
+      return [];
+    });
+    queue = job.then(() => {}, () => {});
+    return job;
+  }
+
+  const api = { add, list: () => read(), remove, clear };
   stores.set(root, api);
   return api;
 }

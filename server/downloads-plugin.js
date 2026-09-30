@@ -1,25 +1,26 @@
-import fs from "node:fs";
 import path from "node:path";
 import { openHistory } from "./history.js";
+import { openBox } from "./secret-box.js";
 
 const DEFAULT_COUNT = 4793;
 
 export function downloadsApi(root) {
   const file = path.join(root, "data", "downloads.json");
   const history = openHistory(root);
+  const box = openBox(root);
   let queue = Promise.resolve();
 
   function readCount() {
-    try {
-      const n = Number(JSON.parse(fs.readFileSync(file, "utf8")).count);
-      if (Number.isFinite(n) && n >= 0) return Math.floor(n);
-    } catch (e) {}
-    return DEFAULT_COUNT;
+    const loaded = box.readJsonFile(file, { count: DEFAULT_COUNT });
+    if (loaded.error) throw new Error("Could not read the download count.");
+    const n = Number(loaded.value && loaded.value.count);
+    const count = Number.isFinite(n) && n >= 0 ? Math.floor(n) : DEFAULT_COUNT;
+    if (loaded.plain && !loaded.missing) writeCount(count);
+    return count;
   }
 
   function writeCount(n) {
-    fs.mkdirSync(path.dirname(file), { recursive: true });
-    fs.writeFileSync(file, JSON.stringify({ count: n }, null, 2) + "\n");
+    box.writeJsonFile(file, { count: n });
   }
 
   function mutate(fn) {

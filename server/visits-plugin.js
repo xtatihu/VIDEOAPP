@@ -3,8 +3,10 @@ import path from "node:path";
 import crypto from "node:crypto";
 import QRCode from "qrcode";
 import { openHistory } from "./history.js";
+import { openBox } from "./secret-box.js";
 
 const DEFAULT_PASS = "Test123";
+const DEFAULT_USER = "admin";
 const MAX_BODY = 24 * 1024;
 const MAX_VISITS = 300;
 
@@ -106,6 +108,21 @@ function privateIp(ip) {
 
 export function visitsApi(root) {
   const history = openHistory(root);
+  const box = openBox(root);
+
+  function cleanUser(name) {
+    return String(name || "").replace(/[\u0000-\u001f]/g, "").trim().slice(0, 32);
+  }
+
+  function validUser(name) {
+    return /^[A-Za-z0-9][A-Za-z0-9 ._-]{2,31}$/.test(name);
+  }
+
+  function writeAuth(auth) {
+    ensureDir();
+    fs.writeFileSync(authFile, box.encrypt(auth));
+    try { fs.chmodSync(authFile, 0o600); } catch (e) {}
+  }
   const dir = path.join(root, "data");
   const visitFile = path.join(dir, "visits.json");
   const keyFile = path.join(dir, "visit.key");
@@ -163,15 +180,23 @@ export function visitsApi(root) {
 
   function readAuth() {
     try {
-      const data = JSON.parse(fs.readFileSync(authFile, "utf8"));
-      if (data && data.salt && data.hash) return data;
+      const raw = fs.readFileSync(authFile, "utf8").trim();
+      let data = null;
+      let plain = false;
+      if (raw.startsWith("{")) {
+        data = JSON.parse(raw);
+        plain = true;
+      } else if (raw) data = box.decrypt(raw);
+      if (data && data.salt && data.hash) {
+        if (!data.username) data.username = DEFAULT_USER;
+        if (plain) writeAuth(data);
+        return data;
+      }
     } catch (e) {}
     const salt = crypto.randomBytes(16).toString("hex");
     const hash = crypto.scryptSync(DEFAULT_PASS, Buffer.from(salt, "hex"), 32).toString("hex");
-    const auth = { salt, hash };
-    ensureDir();
-    fs.writeFileSync(authFile, JSON.stringify(auth));
-    try { fs.chmodSync(authFile, 0o600); } catch (e) {}
+    const auth = { salt, hash, username: DEFAULT_USER };
+    writeAuth(auth);
     return auth;
   }
 
@@ -220,9 +245,7 @@ export function visitsApi(root) {
     if (Object.prototype.hasOwnProperty.call(patch, "enabled")) auth.otpEnabled = patch.enabled === true;
     if (Object.prototype.hasOwnProperty.call(patch, "secret")) auth.otpSecret = patch.secret ? encrypt({ secret: patch.secret }) : "";
     if (Object.prototype.hasOwnProperty.call(patch, "pending")) auth.otpPending = patch.pending ? encrypt({ secret: patch.pending }) : "";
-    ensureDir();
-    fs.writeFileSync(authFile, JSON.stringify(auth));
-    try { fs.chmodSync(authFile, 0o600); } catch (e) {}
+    writeAuth(auth);
   }
 
   function otpGate(body) {
@@ -242,15 +265,20 @@ export function visitsApi(root) {
     const prev = readAuth();
     const salt = crypto.randomBytes(16).toString("hex");
     const hash = crypto.scryptSync(password, Buffer.from(salt, "hex"), 32).toString("hex");
-    ensureDir();
-    fs.writeFileSync(authFile, JSON.stringify({
+    writeAuth({
       salt,
       hash,
+      username: prev.username || DEFAULT_USER,
       otpEnabled: prev.otpEnabled === true,
       otpSecret: prev.otpSecret || "",
       otpPending: prev.otpPending || "",
-    }));
-    try { fs.chmodSync(authFile, 0o600); } catch (e) {}
+    });
+  }
+
+  function userMatches(name) {
+    const auth = readAuth();
+    const saved = cleanUser(auth.username || DEFAULT_USER).toLowerCase();
+    return cleanUser(name).toLowerCase() === saved && saved.length > 0;
   }
 
   function loadVisits() {
@@ -471,7 +499,7 @@ export function visitsApi(root) {
       server.middlewares.use((req, res, next) => {
         const pathOnly = (req.url || "").split("?")[0];
         const otpPath = pathOnly === "/api/otp-status" || pathOnly === "/api/otp/setup" || pathOnly === "/api/otp/confirm" || pathOnly === "/api/otp/disable";
-        if (pathOnly !== "/api/visit" && pathOnly !== "/api/visits" && pathOnly !== "/api/admin-pass" && pathOnly !== "/api/login" && pathOnly !== "/api/history" && !otpPath) return next();
+        if (pathOnly !== "/api/visit" && pathOnly !== "/api/visits" && pathOnly !== "/api/admin-pass" && pathOnly !== "/api/admin-account" && pathOnly !== "/api/login" && pathOnly !== "/api/history" && !otpPath) return next();
 
         if (req.method === "POST" && pathOnly === "/api/visit") {
           readBody(req)
@@ -510,16 +538,20 @@ export function visitsApi(root) {
         if (req.method === "POST" && pathOnly === "/api/login") {
           readBody(req)
             .then((body) => {
-              if (!passwordOk(body.password)) {
-                send(res, 401, { error: "Wrong password." });
+              const username = cleanUser(body.username);
+              if (!userMatches(username) || !passwordOk(body.password)) {
+                history.add({ kind: "login", title: "Sign-in failed", detail: "Username entered: " + (username || "(blank)") });
+                send(res, 401, { error: "Wrong username or password." });
                 return;
               }
               const blocked = otpGate(body);
               if (blocked) {
+                history.add({ kind: "login", title: "Sign-in needs the Authenticator code", detail: "Username " + username });
                 send(res, 401, blocked);
                 return;
               }
-              send(res, 200, { session: issueSession() });
+              history.add({ kind: "login", title: "Admin signed in", detail: "Username " + username });
+              send(res, 200, { session: issueSession(), username: readAuth().username || DEFAULT_USER });
             })
             .catch(() => send(res, 400, { error: "Could not sign in." }));
           return;
@@ -538,6 +570,7 @@ export function visitsApi(root) {
           const secret = base32Encode(crypto.randomBytes(20));
           const uri = "otpauth://totp/" + encodeURIComponent("VideoApp Admin") + "?secret=" + secret + "&issuer=" + encodeURIComponent("VideoApp") + "&digits=6&period=30";
           writeOtp({ pending: secret });
+          history.add({ kind: "otp", title: "Authenticator setup started", detail: "Scan the QR, then enter the 6-digit code to turn it on." });
           QRCode.toDataURL(uri, { margin: 1, width: 240, errorCorrectionLevel: "M" })
             .then((qr) => send(res, 200, { secret, uri, qr }))
             .catch(() => send(res, 200, { secret, uri, qr: "" }));
@@ -561,6 +594,7 @@ export function visitsApi(root) {
                 return;
               }
               writeOtp({ enabled: true, secret: otp.pending, pending: "" });
+              history.add({ kind: "otp", title: "Authenticator turned on", detail: "Login now needs the username, password, and 6-digit code." });
               send(res, 200, { enabled: true });
             })
             .catch(() => send(res, 400, { error: "Could not turn on Authenticator." }));
@@ -580,6 +614,7 @@ export function visitsApi(root) {
                 return;
               }
               writeOtp({ enabled: false, secret: "", pending: "" });
+              history.add({ kind: "otp", title: "Authenticator turned off", detail: "Login needs the username and password." });
               send(res, 200, { enabled: false });
             })
             .catch(() => send(res, 400, { error: "Could not turn off Authenticator." }));
@@ -651,6 +686,88 @@ export function visitsApi(root) {
                 });
               })
               .catch(() => send(res, 400, { error: "Could not save that history row." }));
+            return;
+          }
+          if (req.method === "DELETE") {
+            readBody(req)
+              .then((body) => {
+                if (body.all === true) {
+                  return history.clear()
+                    .then(() => history.add({ kind: "history", title: "History cleared", detail: "The history list was emptied." }))
+                    .then(() => history.list());
+                }
+                const id = clip(body.id, 40);
+                if (!id) {
+                  send(res, 400, { error: "Missing history id." });
+                  return null;
+                }
+                const found = history.list().find((row) => row.id === id);
+                return history.remove(id)
+                  .then(() => history.add({
+                    kind: "history",
+                    title: "History row deleted",
+                    detail: found ? found.title : id,
+                  }))
+                  .then(() => history.list());
+              })
+              .then((events) => {
+                if (events) send(res, 200, { events: history.list() });
+              })
+              .catch(() => send(res, 400, { error: "Could not delete that history row." }));
+            return;
+          }
+        }
+
+        if (pathOnly === "/api/admin-account") {
+          if (!authorized(req)) {
+            send(res, 401, { error: "Wrong username or password." });
+            return;
+          }
+          if (req.method === "GET") {
+            send(res, 200, { username: readAuth().username || DEFAULT_USER });
+            return;
+          }
+          if (req.method === "POST") {
+            readBody(req)
+              .then((body) => {
+                if (!passwordOk(body.old)) {
+                  send(res, 401, { error: "Current password is wrong." });
+                  return;
+                }
+                const prev = readAuth();
+                const nextName = cleanUser(body.username);
+                const nextPass = String(body.next || "");
+                if (nextName && !validUser(nextName)) {
+                  send(res, 400, { error: "Username needs 3 to 32 letters, numbers, spaces, dots, _ or -." });
+                  return;
+                }
+                if (nextPass && nextPass.length < 4) {
+                  send(res, 400, { error: "The new password needs at least 4 characters." });
+                  return;
+                }
+                const userChanged = !!(nextName && nextName.toLowerCase() !== cleanUser(prev.username || DEFAULT_USER).toLowerCase());
+                const passChanged = nextPass.length >= 4;
+                if (!userChanged && !passChanged) {
+                  send(res, 400, { error: "Enter a new username or a new password." });
+                  return;
+                }
+                const salt = passChanged ? crypto.randomBytes(16).toString("hex") : prev.salt;
+                const hash = passChanged ? crypto.scryptSync(nextPass, Buffer.from(salt, "hex"), 32).toString("hex") : prev.hash;
+                writeAuth({
+                  salt,
+                  hash,
+                  username: userChanged ? nextName : (prev.username || DEFAULT_USER),
+                  otpEnabled: prev.otpEnabled === true,
+                  otpSecret: prev.otpSecret || "",
+                  otpPending: prev.otpPending || "",
+                });
+                const bits = [];
+                if (userChanged) bits.push("Username is now " + nextName + ".");
+                if (passChanged) bits.push("Password was changed.");
+                history.add({ kind: "account", title: "Account updated", detail: bits.join(" ") });
+                send(res, 200, { username: readAuth().username });
+              })
+              .catch(() => send(res, 400, { error: "Could not update the account." }));
             return;
           }
         }

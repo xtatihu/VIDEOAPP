@@ -71,6 +71,7 @@
   .vcard{padding:12px;border-radius:14px;background:#16080c;border:1px solid rgba(255,255,255,.08);margin:0 0 10px}
   .vhead{display:flex;gap:10px;align-items:flex-start}
   .vnum{flex:none;width:28px;font-size:18px;font-weight:800;color:#ff8fa3;line-height:1.2}
+  #historyList,#visitList{max-height:62vh;overflow:auto;-webkit-overflow-scrolling:touch}
   .vsum{flex:1;min-width:0}
   .vhead .acts{margin-top:2px}
   .vtop{display:flex;justify-content:space-between;gap:8px;align-items:baseline;margin-bottom:8px}
@@ -109,9 +110,11 @@
 
   <div id="gate" class="card">
     <h1>Admin Login</h1>
-    <div class="sub">VideoApp settings · password gate</div>
-    <label>PASSWORD</label>
-    <input type="password" id="pw" placeholder="Enter admin password" autocomplete="off">
+    <div class="sub">VideoApp settings · username and password</div>
+    <label for="user">USERNAME</label>
+    <input type="text" id="user" placeholder="admin" autocomplete="username" spellcheck="false">
+    <label for="pw">PASSWORD</label>
+    <input type="password" id="pw" placeholder="Enter admin password" autocomplete="current-password">
     <label id="otpLabel" for="otp" hidden>AUTHENTICATOR CODE</label>
     <input type="text" id="otp" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="6-digit code" hidden>
     <p class="hint" id="otpGateHint" hidden>Google Authenticator is on. Type the current 6-digit code, then unlock.</p>
@@ -126,7 +129,7 @@
         <h1>Admin</h1>
       </div>
     </div>
-    <div class="sub">Manage the APK, the video playlist, the words on the page, and each landing-page visit. Visit details are stored encrypted.</div>
+    <div class="sub">Manage the APK, videos, page text, visits, and history. Visits, history, the account, the library, and the download count are stored encrypted.</div>
     <div class="stamp" id="stamp">Last saved: never</div>
 
     <nav class="nav" aria-label="Admin sections">
@@ -296,23 +299,28 @@
 
     <div class="card" data-panel="history" hidden>
       <h2>6 · HISTORY</h2>
-      <p class="hint">Newest first. This keeps APK uploads, auto updates, video changes, downloads, new visits, deleted visits, password changes, and page-text saves.</p>
+      <p class="hint">Newest first. Scroll this list. It keeps sign-ins, username and password changes, Authenticator, APK uploads, auto updates, videos, downloads, visits, deleted rows, and page-text saves. Delete removes one row.</p>
       <div id="historyList" class="plist"></div>
-      <p class="empty" id="historyEmpty">No history yet. Uploads, downloads, and visits will show up here.</p>
-      <button class="btn ghost" id="reloadHistory" type="button">Refresh</button>
+      <p class="empty" id="historyEmpty">No history yet. Uploads, downloads, visits, and account changes will show up here.</p>
+      <div class="row">
+        <button class="btn ghost" id="reloadHistory" type="button">Refresh</button>
+        <button class="btn danger" id="clearHistory" type="button">Clear history</button>
+      </div>
     </div>
 
     <div class="card" data-panel="security" hidden>
-      <h2>5 · PASSWORD</h2>
-      <p class="hint">The password is Test123 until you change it here. Reset does not change the password.</p>
+      <h2>5 · ACCOUNT</h2>
+      <p class="hint" id="accountHint">Username is admin and password is Test123 until you change them here. Reset does not change the username or the password.</p>
       <div class="block">
-        <label>CURRENT PASSWORD</label>
+        <label for="newUser">USERNAME</label>
+        <input type="text" id="newUser" autocomplete="off" spellcheck="false" placeholder="admin">
+        <label for="oldPass">CURRENT PASSWORD</label>
         <input type="password" id="oldPass" autocomplete="off">
-        <label>NEW PASSWORD</label>
-        <input type="password" id="newPass" autocomplete="new-password" placeholder="At least 4 characters">
-        <label>CONFIRM NEW PASSWORD</label>
+        <label for="newPass">NEW PASSWORD</label>
+        <input type="password" id="newPass" autocomplete="new-password" placeholder="Leave empty to keep the current password">
+        <label for="confirmPass">CONFIRM NEW PASSWORD</label>
         <input type="password" id="confirmPass" autocomplete="new-password">
-        <button class="btn" id="savePass">Update Password</button>
+        <button class="btn" id="savePass">Save username and password</button>
       </div>
       <div class="block">
         <h3 class="block-title">GOOGLE AUTHENTICATOR</h3>
@@ -334,7 +342,7 @@
           <button class="btn" id="startOtp" type="button">Set up Authenticator</button>
           <button class="btn ghost" id="disableOtp" type="button" hidden>Turn off</button>
         </div>
-        <p class="hint">Scan the QR with Google Authenticator. While this is on, login needs the password and the 6-digit code. Turn it off here with a current code. Changing the password does not turn this off.</p>
+        <p class="hint">Scan the QR with Google Authenticator. While this is on, login needs the username, the password, and the 6-digit code. Turn it off here with a current code. Changing the username or password does not turn this off.</p>
       </div>
     </div>
 
@@ -367,6 +375,7 @@
 <script>
 (function () {
   var DEFAULT_PASS = "Test123";
+  var DEFAULT_USER = "admin";
   var DEFAULT_APK = "/download";
   var TEXT_IDS = ["logoName", "logoAccent", "subtitle", "hotLabel", "watchLine", "dlMain", "dlSmall", "infoTitle", "infoText", "footText"];
   var PAGE_WORDS = {
@@ -467,6 +476,7 @@
         button.textContent = ok ? "Copied" : "Copy";
         if (ok) setTimeout(function () { if (button.textContent === "Copied") button.textContent = "Copy"; }, 1400);
       }
+      if (ok) noteHistory("video", "Video link copied", link);
       say(ok ? "Link copied." : "Could not copy that link.", ok);
     };
     if (copied) { finish(true); return; }
@@ -1039,8 +1049,14 @@
       kind.textContent = when + (event.detail ? " · " + event.detail : "");
       meta.appendChild(name);
       meta.appendChild(kind);
+      var del = document.createElement("button");
+      del.className = "btn mini danger";
+      del.type = "button";
+      del.textContent = "Delete";
+      del.onclick = function () { removeHistory(event.id); };
       row.appendChild(num);
       row.appendChild(meta);
+      row.appendChild(del);
       list.appendChild(row);
     });
   }
@@ -1053,6 +1069,22 @@
         paintHistory(res.body.events || []);
       })
       .catch(function () {});
+  }
+
+  function removeHistory(id) {
+    if (!id) return;
+    fetch("/api/history", {
+      method: "DELETE",
+      headers: Object.assign({ "content-type": "application/json" }, authHeaders()),
+      body: JSON.stringify({ id: id })
+    })
+      .then(function (r) { return r.json().then(function (body) { return { ok: r.ok, body: body }; }); })
+      .then(function (res) {
+        if (!res.ok) { say(res.body.error || "Could not delete that history row.", false); return; }
+        paintHistory(res.body.events || []);
+        say("History row deleted.", true);
+      })
+      .catch(function () { say("Could not delete that history row.", false); });
   }
 
   function noteHistory(kind, title, detail) {
@@ -1113,35 +1145,63 @@
         else store("show_18", "0");
       }
       stamp();
-      noteHistory("text", "Page text saved", btn.textContent.replace(/\s+/g, " ").trim());
+      var parts = btn.getAttribute("data-save").split(",").map(function (id) {
+        return id + ": " + document.getElementById(id).value.trim();
+      });
+      if (btn.getAttribute("data-save-18") === "1") parts.push("18+: " + (document.getElementById("show18").checked ? "shown" : "hidden"));
+      noteHistory("text", "Page text saved", parts.join(" · "));
       say("Saved. Refresh the landing page to see this section.", true);
     };
   });
+
+  function loadAccount() {
+    return fetch("/api/admin-account", { headers: authHeaders(), cache: "no-store" })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (!data || !data.username) return;
+        document.getElementById("newUser").value = data.username;
+        document.getElementById("user").value = data.username;
+        store("admin_user", data.username);
+        var hint = document.getElementById("accountHint");
+        if (hint) hint.textContent = "Current username is " + data.username + ". Enter the current password, then a new username, a new password, or both. Reset does not change them.";
+      })
+      .catch(function () {});
+  }
 
   document.getElementById("savePass").onclick = function () {
     var oldP = document.getElementById("oldPass").value;
     var next = document.getElementById("newPass").value;
     var again = document.getElementById("confirmPass").value;
-    if (oldP !== pass()) { say("Current password is wrong.", false); return; }
-    if (next.length < 4) { say("The new password needs at least 4 characters.", false); return; }
+    var username = document.getElementById("newUser").value.trim();
+    if (!oldP) { say("Enter the current password.", false); return; }
+    if (next && next.length < 4) { say("The new password needs at least 4 characters.", false); return; }
     if (next !== again) { say("New password and confirmation do not match.", false); return; }
-    fetch("/api/admin-pass", {
+    fetch("/api/admin-account", {
       method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ old: oldP, next: next })
+      headers: Object.assign({ "content-type": "application/json" }, authHeaders()),
+      body: JSON.stringify({ old: oldP, username: username, next: next })
     })
       .then(function (r) { return r.json().then(function (body) { return { ok: r.ok, body: body }; }); })
       .then(function (res) {
-        if (!res.ok) { say(res.body.error || "Could not update the password.", false); return; }
-        if (next === DEFAULT_PASS) del("admin_pass");
-        else store("admin_pass", next);
+        if (!res.ok) { say(res.body.error || "Could not update the account.", false); return; }
+        if (next) {
+          if (next === DEFAULT_PASS) del("admin_pass");
+          else store("admin_pass", next);
+        }
+        if (res.body.username) {
+          store("admin_user", res.body.username);
+          document.getElementById("user").value = res.body.username;
+          document.getElementById("newUser").value = res.body.username;
+        }
         document.getElementById("oldPass").value = "";
         document.getElementById("newPass").value = "";
         document.getElementById("confirmPass").value = "";
         stamp();
-        say("Password updated. Use it the next time you sign in.", true);
+        loadAccount();
+        loadHistory();
+        say("Saved. Use this username and password the next time you sign in.", true);
       })
-      .catch(function () { say("Could not update the password.", false); });
+      .catch(function () { say("Could not update the account.", false); });
   };
 
   var otpOn = false;
@@ -1165,8 +1225,8 @@
     var disable = document.getElementById("disableOtp");
     if (state) {
       state.textContent = otpOn
-        ? "On. Login needs the password and the 6-digit code from Google Authenticator."
-        : "Off. Password alone opens admin. Turn this on to also ask for a code.";
+        ? "On. Login needs the username, password, and the 6-digit code from Google Authenticator."
+        : "Off. Username and password open admin. Turn this on to also ask for a code.";
     }
     if (start) start.hidden = otpOn;
     if (disable) disable.hidden = !otpOn;
@@ -1192,19 +1252,22 @@
 
   function unlock() {
     var typed = pw.value;
+    var username = document.getElementById("user").value.trim();
     fetch("/api/login", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ password: typed, otp: otpCode() })
+      body: JSON.stringify({ username: username, password: typed, otp: otpCode() })
     })
       .then(function (r) { return r.json().then(function (body) { return { ok: r.ok, status: r.status, body: body }; }); })
       .then(function (res) {
         if (res.ok && res.body.session) {
           store("admin_session", res.body.session);
+          store("admin_user", res.body.username || username || DEFAULT_USER);
           if (typed === DEFAULT_PASS) del("admin_pass");
           else store("admin_pass", typed);
           document.getElementById("otp").value = "";
           openPanel();
+          loadAccount();
           return;
         }
         if (res.body && res.body.needsOtp) {
@@ -1212,11 +1275,10 @@
           gateErr.textContent = res.body.error || "Enter the 6-digit Authenticator code.";
           return;
         }
-        gateErr.textContent = (res.body && res.body.error) || "Wrong password.";
+        gateErr.textContent = (res.body && res.body.error) || "Wrong username or password.";
       })
       .catch(function () {
-        if (!otpOn && typed && typed === pass()) openPanel();
-        else gateErr.textContent = "Wrong password.";
+        gateErr.textContent = "Could not reach the server.";
       });
   }
 
@@ -1232,7 +1294,7 @@
       if (name === "visitors") loadVisits();
       if (name === "history") loadHistory();
       if (name === "apk") loadLibrary();
-      if (name === "security") loadOtpStatus(false);
+      if (name === "security") { loadOtpStatus(false); loadAccount(); }
     };
   });
 
@@ -1305,6 +1367,20 @@
   };
 
   document.getElementById("reloadHistory").onclick = function () { loadHistory(); };
+  document.getElementById("clearHistory").onclick = function () {
+    fetch("/api/history", {
+      method: "DELETE",
+      headers: Object.assign({ "content-type": "application/json" }, authHeaders()),
+      body: JSON.stringify({ all: true })
+    })
+      .then(function (r) { return r.json().then(function (body) { return { ok: r.ok, body: body }; }); })
+      .then(function (res) {
+        if (!res.ok) { say(res.body.error || "Could not clear the history.", false); return; }
+        paintHistory(res.body.events || []);
+        say("History cleared.", true);
+      })
+      .catch(function () { say("Could not clear the history.", false); });
+  };
   setInterval(function () {
     if (panel.hidden) return;
     loadLibrary();
@@ -1312,6 +1388,7 @@
   }, 20000);
 
   document.getElementById("loginBtn").onclick = unlock;
+  document.getElementById("user").addEventListener("keydown", function (e) { if (e.key === "Enter") unlock(); });
   pw.addEventListener("keydown", function (e) { if (e.key === "Enter") unlock(); });
   document.getElementById("otp").addEventListener("keydown", function (e) { if (e.key === "Enter") unlock(); });
 
@@ -1390,6 +1467,7 @@
     });
   };
   document.getElementById("lockBtn").onclick = function () {
+    noteHistory("login", "Admin locked", read("admin_user") || DEFAULT_USER);
     del("admin_unlocked");
     del("admin_session");
     panel.hidden = true;
@@ -1397,6 +1475,7 @@
     msg.textContent = "";
   };
 
+  document.getElementById("user").value = read("admin_user") || DEFAULT_USER;
   loadOtpStatus(true).then(function () {
     if (otpOn) return;
     if (read("admin_unlocked") === "1") {

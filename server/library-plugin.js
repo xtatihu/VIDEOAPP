@@ -3,6 +3,7 @@ import path from "node:path";
 import crypto from "node:crypto";
 import Busboy from "busboy";
 import { openHistory } from "./history.js";
+import { openBox } from "./secret-box.js";
 
 const VIDEO_EXT = new Set([".mp4", ".webm", ".ogg", ".mov", ".m4v"]);
 const APK_EXT = new Set([".apk"]);
@@ -15,38 +16,39 @@ function emptyLib() {
 export function libraryApi(root) {
   const file = path.join(root, "data", "library.json");
   const uploadDir = path.join(root, "public", "uploads");
+  const box = openBox(root);
   let queue = Promise.resolve();
 
   function readLib() {
-    try {
-      const data = JSON.parse(fs.readFileSync(file, "utf8"));
-      let apks = Array.isArray(data.apks) ? data.apks.filter((item) => item && item.url) : [];
-      if (!apks.length && data.apk && data.apk.url) apks = [data.apk];
-      apks = apks.map((item) => ({
-        id: item.id || newId(),
-        type: item.type === "file" ? "file" : "link",
-        url: item.url,
-        name: item.name || item.url,
-      }));
-      let activeApkId = data.activeApkId || "";
-      if (!apks.some((item) => item.id === activeApkId)) {
-        activeApkId = apks.length ? apks[apks.length - 1].id : "";
-      }
-      return {
-        apks,
-        activeApkId,
-        videos: Array.isArray(data.videos) ? data.videos : [],
-        nextIndex: Number.isFinite(Number(data.nextIndex)) ? Number(data.nextIndex) : 0,
-        nextApkIndex: Number.isFinite(Number(data.nextApkIndex)) ? Number(data.nextApkIndex) : 0,
-        schedule: data.schedule && data.schedule.url ? data.schedule : null,
-      };
-    } catch (e) {
-      return emptyLib();
+    const loaded = box.readJsonFile(file, null);
+    if (loaded.error) throw new Error("Could not read the library.");
+    const data = loaded.value;
+    if (loaded.missing || !data) return emptyLib();
+    let apks = Array.isArray(data.apks) ? data.apks.filter((item) => item && item.url) : [];
+    if (!apks.length && data.apk && data.apk.url) apks = [data.apk];
+    apks = apks.map((item) => ({
+      id: item.id || newId(),
+      type: item.type === "file" ? "file" : "link",
+      url: item.url,
+      name: item.name || item.url,
+    }));
+    let activeApkId = data.activeApkId || "";
+    if (!apks.some((item) => item.id === activeApkId)) {
+      activeApkId = apks.length ? apks[apks.length - 1].id : "";
     }
+    const lib = {
+      apks,
+      activeApkId,
+      videos: Array.isArray(data.videos) ? data.videos : [],
+      nextIndex: Number.isFinite(Number(data.nextIndex)) ? Number(data.nextIndex) : 0,
+      nextApkIndex: Number.isFinite(Number(data.nextApkIndex)) ? Number(data.nextApkIndex) : 0,
+      schedule: data.schedule && data.schedule.url ? data.schedule : null,
+    };
+    if (loaded.plain && !loaded.missing) writeLib(lib);
+    return lib;
   }
 
   function writeLib(lib) {
-    fs.mkdirSync(path.dirname(file), { recursive: true });
     const clean = {
       apks: lib.apks || [],
       activeApkId: lib.activeApkId || "",
@@ -55,7 +57,7 @@ export function libraryApi(root) {
       nextApkIndex: lib.nextApkIndex || 0,
       schedule: lib.schedule || null,
     };
-    fs.writeFileSync(file, JSON.stringify(clean, null, 2) + "\n");
+    box.writeJsonFile(file, clean);
   }
 
   function applyDue(lib) {
