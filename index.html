@@ -49,13 +49,23 @@
   .rail-track span{filter:drop-shadow(0 4px 6px rgba(0,0,0,.35))}
   @keyframes rail{from{transform:translateX(0)}to{transform:translateX(-50%)}}
 
-  .video-box{position:relative;width:100%;overflow:hidden;border-radius:26px;background:#000;
-    box-shadow:0 22px 50px rgba(0,0,0,.55), 0 0 36px rgba(255,45,85,.28), inset 0 0 0 1px rgba(255,255,255,.08);
-    border:1px solid rgba(255,90,130,.35)}
-  .video-box video{display:block;width:100%;min-height:280px;max-height:62vh;object-fit:cover;background:#000}
-  .video-fade{position:absolute;left:0;right:0;bottom:0;height:120px;pointer-events:none;
-    background:linear-gradient(transparent,rgba(0,0,0,.9))}
-  .watch-text{position:absolute;left:0;right:0;bottom:18px;z-index:2;pointer-events:none;
+  .video-box{position:relative;width:100%;overflow:hidden;border-radius:26px;aspect-ratio:4/5;
+    background:
+      linear-gradient(160deg, rgba(255,255,255,.16), transparent 28%),
+      radial-gradient(120% 80% at 50% 0%, rgba(255,70,110,.35), transparent 55%),
+      #070607;
+    box-shadow:0 22px 50px rgba(0,0,0,.55), 0 0 36px rgba(255,45,85,.28), inset 0 1px 0 rgba(255,255,255,.28), inset 0 0 0 1px rgba(255,255,255,.08);
+    border:1px solid rgba(255,90,130,.4)}
+  .mirror-bg{position:absolute;inset:-10%;width:120%;height:120%;object-fit:cover;z-index:0;
+    transform:scaleX(-1);filter:blur(18px) saturate(1.45) brightness(.62);pointer-events:none}
+  .video-box video#preview{position:absolute;z-index:1;left:8%;top:5%;width:84%;height:70%;
+    min-height:0;max-height:none;object-fit:cover;border-radius:18px;background:#000;
+    box-shadow:0 16px 36px rgba(0,0,0,.55), 0 0 0 1px rgba(255,255,255,.2)}
+  .video-box::after{content:"";position:absolute;inset:0;z-index:2;pointer-events:none;
+    background:linear-gradient(115deg, rgba(255,255,255,.22), transparent 24%, transparent 60%, rgba(255,255,255,.08))}
+  .video-fade{position:absolute;left:8%;right:8%;top:57%;height:18%;z-index:3;pointer-events:none;
+    background:linear-gradient(transparent,rgba(0,0,0,.55));border-radius:0 0 18px 18px}
+  .watch-text{position:absolute;left:8%;right:8%;bottom:3.5%;z-index:4;pointer-events:none;
     font-size:16px;font-weight:800;text-shadow:0 2px 10px #000;line-height:1.7}
   .watch-text .hot{display:inline-block;font-size:12px;font-weight:800;letter-spacing:3px;
     color:#ffcf40;border:1px solid rgba(255,207,64,.55);border-radius:999px;
@@ -65,7 +75,7 @@
   .arrow{display:block;margin:4px auto 0;width:26px;height:26px;animation:bounce 1.2s infinite;opacity:.9}
   @keyframes bounce{0%,100%{transform:translateY(0)}50%{transform:translateY(6px)}}
 
-  .sticker{position:absolute;z-index:3;pointer-events:none;user-select:none;
+  .sticker{position:absolute;z-index:5;pointer-events:none;user-select:none;
     font-size:26px;line-height:1;filter:drop-shadow(0 6px 8px rgba(0,0,0,.5));
     animation:floaty 3s ease-in-out infinite}
   .s1{top:10px;left:10px}
@@ -174,6 +184,9 @@
     <span class="sticker s8" aria-hidden="true">🥵</span>
     <span class="sticker s9" aria-hidden="true">😈</span>
     <span class="sticker s10" aria-hidden="true">🌶️</span>
+    <video id="mirror" class="mirror-bg" muted autoplay loop playsinline preload="metadata" aria-hidden="true">
+      <source id="mirrorSource" src="https://github-production-user-asset-6210df.s3.amazonaws.com/326748109/657620961-51f4f6cc-5d64-43b2-ac05-f447da6854dd.mp4?X-Amz-Algorithm=AWS4-HMAC-SHA256&amp;X-Amz-Credential=AKIAVCODYLSA53PQK4ZA%2F20260929%2Fus-east-1%2Fs3%2Faws4_request&amp;X-Amz-Date=20260929T093117Z&amp;X-Amz-Expires=300&amp;X-Amz-Signature=ce9c138f532742e478ba6b311f06bd471c0a8ec4bcbb8eec4ec43003fcff6a53&amp;X-Amz-SignedHeaders=host&amp;response-content-type=video%2Fmp4" type="video/mp4">
+    </video>
     <video id="preview" controls autoplay muted loop playsinline preload="metadata">
       <source id="videoSource" src="https://github-production-user-asset-6210df.s3.amazonaws.com/326748109/657620961-51f4f6cc-5d64-43b2-ac05-f447da6854dd.mp4?X-Amz-Algorithm=AWS4-HMAC-SHA256&amp;X-Amz-Credential=AKIAVCODYLSA53PQK4ZA%2F20260929%2Fus-east-1%2Fs3%2Faws4_request&amp;X-Amz-Date=20260929T093117Z&amp;X-Amz-Expires=300&amp;X-Amz-Signature=ce9c138f532742e478ba6b311f06bd471c0a8ec4bcbb8eec4ec43003fcff6a53&amp;X-Amz-SignedHeaders=host&amp;response-content-type=video%2Fmp4" type="video/mp4">
       Your browser does not support video playback.
@@ -206,7 +219,9 @@
   var DEFAULT_VIDEO = document.getElementById("videoSource").getAttribute("src");
   var DEFAULT_APK = "/download";
   var source = document.getElementById("videoSource");
+  var mirrorSource = document.getElementById("mirrorSource");
   var video = document.getElementById("preview");
+  var mirror = document.getElementById("mirror");
   var download = document.getElementById("download");
 
   function read(key) {
@@ -220,10 +235,18 @@
     var nextApk = apkUrl || DEFAULT_APK;
     if (source.getAttribute("src") !== nextVideo) {
       source.setAttribute("src", nextVideo);
+      mirrorSource.setAttribute("src", nextVideo);
       video.load();
+      mirror.load();
     }
     if (download.getAttribute("href") !== nextApk) download.setAttribute("href", nextApk);
   }
+
+  video.addEventListener("play", function () { mirror.play().catch(function () {}); });
+  video.addEventListener("pause", function () { mirror.pause(); });
+  video.addEventListener("seeked", function () {
+    try { mirror.currentTime = video.currentTime; } catch (e) {}
+  });
 
   applyLinks();
   window.addEventListener("pageshow", applyLinks);
