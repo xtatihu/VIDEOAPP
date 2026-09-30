@@ -68,6 +68,9 @@
   .mini.danger{background:transparent;color:#ffb4c0;border:1px solid rgba(255,90,110,.75)}
   .empty{font-size:13px;color:#c9a3ad;margin:0 0 12px;line-height:1.4}
   .vcard{padding:12px;border-radius:14px;background:#16080c;border:1px solid rgba(255,255,255,.08);margin:0 0 10px}
+  .vhead{display:flex;gap:10px;align-items:flex-start}
+  .vsum{flex:1;min-width:0}
+  .vhead .acts{margin-top:2px}
   .vtop{display:flex;justify-content:space-between;gap:8px;align-items:baseline;margin-bottom:8px}
   .vtop strong{font-size:13px}
   .vtime{font-size:11px;color:#e7b7c2}
@@ -255,7 +258,7 @@
 
     <div class="card" data-panel="visitors" hidden>
       <h2>4 · VISITORS</h2>
-      <p class="hint">Every landing-page open is saved here in the same detail as network, location, phone, browser, and behavior. The saved file is encrypted. This list opens only with the admin password. A phone on a normal mobile network shows ISP, city, model, and live status when the browser shares them.</p>
+      <p class="hint">Each row shows the date, IP, location, device, time on the page, and which landing button they tapped. View opens the rest. The saved file is encrypted.</p>
       <div id="visitList" class="plist"></div>
       <p class="empty" id="visitEmpty">No visits yet. Open the landing page and this list will fill in.</p>
       <div class="row">
@@ -730,22 +733,12 @@
     visits.forEach(function (visit, index) {
       var card = document.createElement("article");
       card.className = "vcard";
-      var top = document.createElement("div");
-      top.className = "vtop";
-      var title = document.createElement("strong");
       var ident = visit.identity || {};
       var visitsN = ident.visits || 1;
-      var shortId = String(ident.visitorId || visit.visitorId || "").slice(0, 6).toUpperCase();
-      title.textContent = (index + 1) + ". Visitor " + (shortId || "—");
-      var time = document.createElement("div");
-      time.className = "vtime";
       var live = liveStatus(visit);
-      time.textContent = (visit.startedAt ? new Date(visit.startedAt).toLocaleString() : "") + (live ? " · " + live : "");
-      if (live === "Active Right Now") time.className = "vtime vlive";
-      top.appendChild(title);
-      top.appendChild(time);
       var grid = document.createElement("div");
       grid.className = "vgrid";
+      grid.hidden = true;
       var loc = visit.location || {};
       var net = visit.network || {};
       var dev = visit.device || {};
@@ -788,10 +781,38 @@
         ["Time Spent", timeSpent(beh.visibleSeconds)],
         ["Scroll Depth", (beh.maxScroll || 0) + "%"],
         ["Live Status", live],
-        ["Downloads", beh.downloadClicks || 0],
+        ["Clicked", beh.clicks],
         ["Video played", beh.played ? "Yes" : "No"]
       ]));
-      card.appendChild(top);
+      var head = document.createElement("div");
+      head.className = "vhead";
+      var summary = document.createElement("div");
+      summary.className = "vsum";
+      var when = visit.startedAt ? new Date(visit.startedAt).toLocaleString() : "";
+      var deviceLine = [dev.category || (dev.mobile ? "Mobile (Smartphone)" : ""), dev.os || dev.platform, dev.model].filter(Boolean).join(" · ");
+      summary.appendChild(visitLine("Date and Time", when));
+      summary.appendChild(visitLine("IP Address", net.ip));
+      summary.appendChild(visitLine("Location", countryCity));
+      summary.appendChild(visitLine("Device", deviceLine));
+      summary.appendChild(visitLine("Time Spent", timeSpent(beh.visibleSeconds)));
+      summary.appendChild(visitLine("Click", beh.clicks || "No click yet"));
+      var viewBtn = document.createElement("button");
+      viewBtn.className = "btn mini";
+      viewBtn.type = "button";
+      viewBtn.textContent = "View";
+      viewBtn.onclick = function () {
+        var opening = grid.hidden;
+        document.querySelectorAll("#visitList .vgrid").forEach(function (panel) { panel.hidden = true; });
+        document.querySelectorAll("#visitList [data-visit-view]").forEach(function (btn) { btn.textContent = "View"; });
+        if (opening) {
+          grid.hidden = false;
+          viewBtn.textContent = "Hide";
+        }
+      };
+      viewBtn.setAttribute("data-visit-view", "1");
+      head.appendChild(summary);
+      head.appendChild(viewBtn);
+      card.appendChild(head);
       card.appendChild(grid);
       list.appendChild(card);
     });

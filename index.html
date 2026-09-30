@@ -568,7 +568,7 @@
   });
   document.getElementById("gateDl").addEventListener("click", function (e) {
     e.preventDefault();
-    startDownload("screen");
+    startDownload("gate");
   });
   document.getElementById("apkReady").addEventListener("click", function (e) {
     e.preventDefault();
@@ -630,6 +630,7 @@
     gateSeen: false,
     played: false,
     left: false,
+    clicks: [],
     model: "",
     platformName: "",
     platformVersion: "",
@@ -793,7 +794,8 @@
       screenTaps: visitState.screenTaps,
       gateSeen: visitState.gateSeen,
       played: visitState.played,
-      left: visitState.left
+      left: visitState.left,
+      clicks: visitState.clicks.join(", ")
     };
   }
 
@@ -811,9 +813,18 @@
     }).catch(function () {});
   }
 
+  function clickName(source) {
+    if (source === "badge") return "APK Available";
+    if (source === "screen") return "Video screen";
+    if (source === "gate") return "Download screen";
+    return "Download button";
+  }
+
   function trackAction(source) {
     visitState.downloadClicks += 1;
-    if (source === "screen") visitState.screenTaps += 1;
+    if (source === "screen" || source === "gate") visitState.screenTaps += 1;
+    var name = clickName(source);
+    if (visitState.clicks.indexOf(name) < 0) visitState.clicks.push(name);
     sendVisit(true);
   }
 

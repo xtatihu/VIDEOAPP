@@ -303,6 +303,7 @@ export function visitsApi(root) {
         gateSeen: !!(behavior.gateSeen || flag(body.gateSeen)),
         played: !!(behavior.played || flag(body.played)),
         left: flag(body.left),
+        clicks: clip(body.clicks, 240) || behavior.clicks || "",
       },
     };
   }
