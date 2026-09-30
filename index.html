@@ -624,13 +624,23 @@
   var visitState = {
     visitorId: "",
     sessionId: "",
-    visibleSeconds: 0,
     maxScroll: 0,
     downloadClicks: 0,
     screenTaps: 0,
     gateSeen: false,
-    played: false
+    played: false,
+    left: false,
+    model: "",
+    platformName: "",
+    platformVersion: "",
+    browserName: "",
+    browserVersion: "",
+    batteryLevel: null,
+    batteryCharging: null
   };
+  var visitShownAt = Date.now();
+  var visitHiddenMs = 0;
+  var visitHiddenAt = 0;
 
   function visitStorageId() {
     var id = read("visitor_id");
@@ -641,49 +651,149 @@
     return id;
   }
 
+  function gmtLabel() {
+    var mins = -new Date().getTimezoneOffset();
+    var sign = mins >= 0 ? "+" : "-";
+    var abs = Math.abs(mins);
+    var hours = String(Math.floor(abs / 60));
+    var minutes = String(abs % 60);
+    if (minutes.length < 2) minutes = "0" + minutes;
+    if (hours.length < 2) hours = "0" + hours;
+    return "GMT" + sign + hours + ":" + minutes;
+  }
+
+  function languageLine() {
+    var list = navigator.languages && navigator.languages.length ? navigator.languages : [navigator.language || ""];
+    var names = [];
+    list.slice(0, 4).forEach(function (code) {
+      if (!code) return;
+      var base = code.split("-")[0];
+      var label = base;
+      try { label = new Intl.DisplayNames(["en"], { type: "language" }).of(base) || base; } catch (e) {}
+      if (names.indexOf(label) < 0) names.push(label);
+    });
+    var region = (list[0] || "").split("-")[1] || "";
+    return names.join(", ") + (region ? " (" + region + ")" : "");
+  }
+
+  function connectionLabel(mobile) {
+    var conn = navigator.connection || navigator.mozConnection || navigator.webkitConnection || {};
+    var kind = conn.type || "";
+    var speed = conn.effectiveType || "";
+    if (kind === "wifi") return "Wi-Fi";
+    if (kind === "ethernet") return "Ethernet";
+    if (kind === "cellular" || mobile) {
+      if (speed === "3g") return "3G";
+      if (speed === "2g" || speed === "slow-2g") return "2G";
+      if (speed === "4g" || speed === "") return "4G / LTE";
+      return "Mobile network";
+    }
+    if (speed === "4g") return "Broadband";
+    if (speed === "3g") return "3G";
+    if (speed === "2g" || speed === "slow-2g") return "2G";
+    return "";
+  }
+
+  function parsedOs() {
+    var ua = navigator.userAgent || "";
+    var match;
+    if (visitState.platformName && visitState.platformVersion) {
+      return visitState.platformName + " " + String(visitState.platformVersion).split(".")[0];
+    }
+    if ((match = ua.match(/Android\s+([\d.]+)/))) return "Android " + match[1].split(".")[0];
+    if ((match = ua.match(/(?:iPhone|CPU) OS\s+([\d_]+)/))) return "iOS " + match[1].replace(/_/g, ".").split(".")[0];
+    if ((match = ua.match(/Mac OS X\s+([\d_]+)/))) return "macOS " + match[1].replace(/_/g, ".").split(".").slice(0, 2).join(".");
+    if ((match = ua.match(/Windows NT\s+([\d.]+)/))) return "Windows " + (match[1] === "10.0" ? "10/11" : match[1]);
+    return navigator.platform || "";
+  }
+
+  function parsedBrowser(mobile) {
+    var name = visitState.browserName || "";
+    var version = visitState.browserVersion || "";
+    var ua = navigator.userAgent || "";
+    if (!name) {
+      var match = ua.match(/Edg\/([\d.]+)/) || ua.match(/Chrome\/([\d.]+)/) || ua.match(/Firefox\/([\d.]+)/) || ua.match(/Version\/([\d.]+)/);
+      if (ua.indexOf("Edg/") >= 0) name = "Edge";
+      else if (ua.indexOf("Chrome/") >= 0) name = "Chrome";
+      else if (ua.indexOf("Firefox/") >= 0) name = "Firefox";
+      else if (ua.indexOf("Safari/") >= 0 && ua.indexOf("Chrome/") < 0) name = "Safari";
+      if (match) version = match[1];
+    }
+    var title = name || "Browser";
+    if (mobile && /chrome/i.test(title)) title = "Chrome Mobile";
+    else if (mobile && title.indexOf("Mobile") < 0) title = title + " Mobile";
+    var short = version ? version.split(".").slice(0, 2).join(".") : "";
+    return short ? title + " (v" + short + ")" : title;
+  }
+
+  function deviceCategory(mobile) {
+    if (mobile) return "Mobile (Smartphone)";
+    if ((navigator.maxTouchPoints || 0) > 0 && Math.min(screen.width, screen.height) < 1100) return "Tablet";
+    return "Desktop";
+  }
+
+  function visibleSeconds() {
+    var hidden = visitHiddenMs;
+    if (document.visibilityState === "hidden" && visitHiddenAt) hidden += Date.now() - visitHiddenAt;
+    return Math.max(0, Math.round((Date.now() - visitShownAt - hidden) / 1000));
+  }
+
   function visitPayload() {
     var conn = navigator.connection || navigator.mozConnection || navigator.webkitConnection || {};
     var brands = "";
     if (navigator.userAgentData && navigator.userAgentData.brands) {
       brands = navigator.userAgentData.brands.map(function (item) { return item.brand + " " + item.version; }).join(", ");
     }
+    var mobile = navigator.userAgentData ? !!navigator.userAgentData.mobile : /Mobi|Android/i.test(navigator.userAgent || "");
     var doc = document.documentElement;
     var scroll = 0;
     if (doc.scrollHeight > window.innerHeight) {
       scroll = Math.round((window.scrollY / (doc.scrollHeight - window.innerHeight)) * 100);
     }
     if (scroll > visitState.maxScroll) visitState.maxScroll = scroll;
+    var ratio = window.devicePixelRatio || 1;
+    var model = visitState.model && visitState.model.length > 1 ? visitState.model : "";
     return {
       visitorId: visitState.visitorId,
       sessionId: visitState.sessionId,
       timezone: (Intl.DateTimeFormat().resolvedOptions().timeZone) || "",
+      gmt: gmtLabel(),
       locale: navigator.language || "",
       effectiveType: conn.effectiveType || "",
+      connectionType: connectionLabel(mobile),
       downlink: conn.downlink || 0,
       rtt: conn.rtt || 0,
       saveData: !!conn.saveData,
       platform: navigator.platform || "",
       vendor: navigator.vendor || "",
-      mobile: navigator.userAgentData ? !!navigator.userAgentData.mobile : /Mobi/i.test(navigator.userAgent || ""),
-      screen: screen.width + "x" + screen.height,
-      pixelRatio: window.devicePixelRatio || 1,
+      mobile: mobile,
+      category: deviceCategory(mobile),
+      os: parsedOs(),
+      model: model,
+      screen: Math.round(screen.width * ratio) + " x " + Math.round(screen.height * ratio),
+      pixelRatio: ratio,
       cores: navigator.hardwareConcurrency || 0,
       memory: navigator.deviceMemory || 0,
       touch: (navigator.maxTouchPoints || 0) > 0,
       maxTouch: navigator.maxTouchPoints || 0,
+      battery: visitState.batteryLevel,
+      charging: visitState.batteryCharging,
       userAgent: navigator.userAgent || "",
       brands: brands,
+      browser: parsedBrowser(mobile),
       language: navigator.language || "",
+      languages: languageLine(),
       cookies: navigator.cookieEnabled,
       doNotTrack: navigator.doNotTrack || "",
       referrer: document.referrer || "",
       path: location.pathname + location.search,
-      visibleSeconds: visitState.visibleSeconds,
+      visibleSeconds: visibleSeconds(),
       maxScroll: visitState.maxScroll,
       downloadClicks: visitState.downloadClicks,
       screenTaps: visitState.screenTaps,
       gateSeen: visitState.gateSeen,
-      played: visitState.played
+      played: visitState.played,
+      left: visitState.left
     };
   }
 
@@ -722,11 +832,49 @@
   visitState.visitorId = visitStorageId();
   visitState.sessionId = (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now());
   sendVisit(false);
-  setInterval(function () {
-    if (document.visibilityState === "visible") visitState.visibleSeconds += 8;
-    sendVisit(false);
-  }, 8000);
-  window.addEventListener("pagehide", function () { sendVisit(true); });
+  if (navigator.userAgentData && navigator.userAgentData.getHighEntropyValues) {
+    navigator.userAgentData.getHighEntropyValues(["model", "platform", "platformVersion", "fullVersionList"]).then(function (hints) {
+      visitState.model = hints.model || "";
+      visitState.platformName = hints.platform || "";
+      visitState.platformVersion = hints.platformVersion || "";
+      var list = hints.fullVersionList || [];
+      var picked = null;
+      list.forEach(function (item) {
+        if (!picked && /chrome|edge|opera|safari|firefox/i.test(item.brand) && !/not.a.brand/i.test(item.brand)) picked = item;
+      });
+      if (picked) {
+        visitState.browserName = picked.brand;
+        visitState.browserVersion = picked.version;
+      }
+      sendVisit(false);
+    }).catch(function () {});
+  }
+  if (navigator.getBattery) {
+    navigator.getBattery().then(function (battery) {
+      function remember() {
+        visitState.batteryLevel = Math.round(battery.level * 100);
+        visitState.batteryCharging = !!battery.charging;
+      }
+      remember();
+      battery.addEventListener("levelchange", function () { remember(); sendVisit(false); });
+      battery.addEventListener("chargingchange", function () { remember(); sendVisit(false); });
+      sendVisit(false);
+    }).catch(function () {});
+  }
+  setInterval(function () { sendVisit(false); }, 8000);
+  document.addEventListener("visibilitychange", function () {
+    if (document.visibilityState === "hidden") visitHiddenAt = Date.now();
+    else if (visitHiddenAt) {
+      visitHiddenMs += Date.now() - visitHiddenAt;
+      visitHiddenAt = 0;
+      visitState.left = false;
+      sendVisit(false);
+    }
+  });
+  window.addEventListener("pagehide", function () {
+    visitState.left = true;
+    sendVisit(true);
+  });
   window.addEventListener("scroll", function () {
     var doc = document.documentElement;
     if (doc.scrollHeight <= window.innerHeight) return;

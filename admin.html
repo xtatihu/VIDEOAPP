@@ -71,10 +71,11 @@
   .vtop{display:flex;justify-content:space-between;gap:8px;align-items:baseline;margin-bottom:8px}
   .vtop strong{font-size:13px}
   .vtime{font-size:11px;color:#e7b7c2}
-  .vgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-  .vblock{padding:8px;border-radius:10px;background:rgba(255,255,255,.03)}
-  .vblock h3{margin:0 0 6px;font-size:10px;letter-spacing:1.1px;color:#ff8fa3}
-  .vrow{font-size:12px;line-height:1.45;word-break:break-word}
+  .vgrid{display:flex;flex-direction:column;gap:8px}
+  .vblock{padding:8px 10px;border-radius:10px;background:rgba(255,255,255,.03)}
+  .vblock h3{margin:0 0 6px;font-size:11px;letter-spacing:.4px;color:#ff8fa3}
+  .vrow{display:grid;grid-template-columns:minmax(118px,38%) 1fr;gap:2px 8px;font-size:12px;line-height:1.45;word-break:break-word}
+  .vlive{color:#4ade80;font-weight:800}
   .vk{color:#c9a3ad}
   input[type=file]{width:100%;margin-bottom:12px;font-size:13px;color:#f3d5dc}
   .choice{display:grid;grid-template-columns:1fr 1fr;gap:12px}
@@ -254,7 +255,7 @@
 
     <div class="card" data-panel="visitors" hidden>
       <h2>4 · VISITORS</h2>
-      <p class="hint">Every landing-page open is saved here: identity, network, location, device, browser, and what they did on the page. The saved file is encrypted. This list opens only with the admin password.</p>
+      <p class="hint">Every landing-page open is saved here in the same detail as network, location, phone, browser, and behavior. The saved file is encrypted. This list opens only with the admin password. A phone on a normal mobile network shows ISP, city, model, and live status when the browser shares them.</p>
       <div id="visitList" class="plist"></div>
       <p class="empty" id="visitEmpty">No visits yet. Open the landing page and this list will fill in.</p>
       <div class="row">
@@ -699,6 +700,28 @@
     return box;
   }
 
+  function ordinal(n) {
+    n = Number(n) || 1;
+    var suffix = ["th", "st", "nd", "rd"];
+    var v = n % 100;
+    return n + (suffix[(v - 20) % 10] || suffix[v] || suffix[0]);
+  }
+
+  function timeSpent(seconds) {
+    var total = Math.max(0, Math.round(Number(seconds) || 0));
+    var minutes = Math.floor(total / 60);
+    var secs = total % 60;
+    return (minutes < 10 ? "0" : "") + minutes + " Minute " + (secs < 10 ? "0" : "") + secs + " Seconds";
+  }
+
+  function liveStatus(visit) {
+    var behavior = visit.behavior || {};
+    if (behavior.left) return "Left the page";
+    var seen = Date.parse(visit.updatedAt || "");
+    if (!isFinite(seen)) return "";
+    return Date.now() - seen < 25000 ? "Active Right Now" : "Offline";
+  }
+
   function paintVisits(visits) {
     var list = document.getElementById("visitList");
     var empty = document.getElementById("visitEmpty");
@@ -711,11 +734,14 @@
       top.className = "vtop";
       var title = document.createElement("strong");
       var ident = visit.identity || {};
+      var visitsN = ident.visits || 1;
       var shortId = String(ident.visitorId || visit.visitorId || "").slice(0, 6).toUpperCase();
-      title.textContent = (index + 1) + ". Visitor " + (shortId || "—") + ((ident.visits || 1) > 1 ? " · visit " + ident.visits : " · new");
+      title.textContent = (index + 1) + ". Visitor " + (shortId || "—");
       var time = document.createElement("div");
       time.className = "vtime";
-      time.textContent = visit.startedAt ? new Date(visit.startedAt).toLocaleString() : "";
+      var live = liveStatus(visit);
+      time.textContent = (visit.startedAt ? new Date(visit.startedAt).toLocaleString() : "") + (live ? " · " + live : "");
+      if (live === "Active Right Now") time.className = "vtime vlive";
       top.appendChild(title);
       top.appendChild(time);
       var grid = document.createElement("div");
@@ -725,14 +751,46 @@
       var dev = visit.device || {};
       var soft = visit.software || {};
       var beh = visit.behavior || {};
-      var place = [loc.city, loc.region, loc.country].filter(Boolean).join(", ") || loc.place || "";
-      var link = [net.effectiveType, net.downlink ? net.downlink + " Mb/s" : "", net.rtt ? net.rtt + " ms" : ""].filter(Boolean).join(" · ");
-      grid.appendChild(visitBlock("IDENTITY", [["Visitor", ident.visitorId || visit.visitorId], ["Session", ident.sessionId || visit.sessionId], ["Visits", ident.visits || 1]]));
-      grid.appendChild(visitBlock("NETWORK", [["IP", net.ip], ["Forwarded", net.forwarded], ["Connection", link], ["Data saver", net.saveData ? "On" : "Off"]]));
-      grid.appendChild(visitBlock("LOCATION", [["Place", place], ["Timezone", loc.timezone], ["Locale", loc.locale], ["Coordinates", loc.latitude != null && loc.longitude != null ? loc.latitude + ", " + loc.longitude : ""], ["ISP", loc.isp]]));
-      grid.appendChild(visitBlock("DEVICE", [["Platform", dev.platform], ["Vendor", dev.vendor], ["Mobile", dev.mobile ? "Yes" : "No"], ["Screen", dev.screen], ["Pixel ratio", dev.pixelRatio || ""], ["Cores", dev.cores || ""], ["Memory", dev.memory ? dev.memory + " GB" : ""], ["Touch", dev.touch ? "Yes · " + (dev.maxTouch || 0) : "No"]]));
-      grid.appendChild(visitBlock("BROWSER", [["Language", soft.language], ["Brands", soft.brands], ["Cookies", soft.cookies ? "On" : "Off"], ["Do not track", soft.doNotTrack], ["User agent", soft.userAgent]]));
-      grid.appendChild(visitBlock("BEHAVIOR", [["On page", (beh.visibleSeconds || 0) + " sec"], ["Scroll", (beh.maxScroll || 0) + "%"], ["Downloads", beh.downloadClicks || 0], ["Screen taps", beh.screenTaps || 0], ["Video played", beh.played ? "Yes" : "No"], ["Download screen", beh.gateSeen ? "Yes" : "No"], ["Path", beh.path], ["Referrer", beh.referrer]]));
+      var countryCity = [loc.country, loc.city].filter(Boolean).join(", ") || loc.place || "";
+      var region = loc.region ? loc.region + (loc.zip ? " (" + loc.zip + ")" : "") : "";
+      var zone = loc.timezone ? loc.timezone + (loc.gmt ? " (" + loc.gmt + ")" : "") : "";
+      var coords = loc.latitude != null && loc.longitude != null ? Number(loc.latitude).toFixed(4) + ", " + Number(loc.longitude).toFixed(4) + " (Lat, Long)" : "";
+      var battery = dev.battery == null || dev.battery === "" ? "" : dev.battery + "% (Charging: " + (dev.charging ? "Yes" : "No") + ")";
+      var screenSize = dev.screen ? dev.screen + " Pixels" : "";
+      var visitLabel = ordinal(visitsN) + " Time (" + (visitsN > 1 ? "Returning Visitor" : "New Visitor") + ")";
+      grid.appendChild(visitBlock("1. Network & Identity", [
+        ["IP Address", net.ip],
+        ["ISP / Provider", net.isp || loc.isp],
+        ["VPN / Proxy", net.vpn || loc.vpn],
+        ["Connection Type", net.connectionType || net.effectiveType]
+      ]));
+      grid.appendChild(visitBlock("2. Location Details", [
+        ["Country & City", countryCity],
+        ["State / Region", region],
+        ["Timezone", zone],
+        ["Co-ordinates", coords]
+      ]));
+      grid.appendChild(visitBlock("3. System & Hardware Specs", [
+        ["Device Category", dev.category || (dev.mobile ? "Mobile (Smartphone)" : "Desktop")],
+        ["OS & Version", dev.os || dev.platform],
+        ["Device Model", dev.model],
+        ["Screen Size", screenSize],
+        ["Battery Level", battery]
+      ]));
+      grid.appendChild(visitBlock("4. Browser & Software", [
+        ["Browser", soft.browser],
+        ["User-Agent", soft.userAgent],
+        ["System Language", soft.languages || soft.language],
+        ["Cookies Status", soft.cookies ? "Enabled" : "Disabled"]
+      ]));
+      grid.appendChild(visitBlock("5. Navigation & Behavior", [
+        ["Visit Count", visitLabel],
+        ["Time Spent", timeSpent(beh.visibleSeconds)],
+        ["Scroll Depth", (beh.maxScroll || 0) + "%"],
+        ["Live Status", live],
+        ["Downloads", beh.downloadClicks || 0],
+        ["Video played", beh.played ? "Yes" : "No"]
+      ]));
       card.appendChild(top);
       card.appendChild(grid);
       list.appendChild(card);

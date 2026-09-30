@@ -151,29 +151,60 @@ export function visitsApi(root) {
     return clip(req.socket && req.socket.remoteAddress, 80);
   }
 
-  async function lookupGeo(ip) {
-    const clean = String(ip || "").replace(/^::ffff:/, "");
-    if (privateIp(clean)) return null;
+  async function fetchJson(url) {
     const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), 1200);
+    const timer = setTimeout(() => ctrl.abort(), 1500);
     try {
-      const res = await fetch("https://ipwho.is/" + encodeURIComponent(clean), { signal: ctrl.signal });
+      const res = await fetch(url, { signal: ctrl.signal });
       if (!res.ok) return null;
-      const data = await res.json();
-      if (!data || data.success === false) return null;
-      return {
-        country: clip(data.country, 80),
-        region: clip(data.region, 80),
-        city: clip(data.city, 80),
-        latitude: Number.isFinite(Number(data.latitude)) ? Number(data.latitude) : null,
-        longitude: Number.isFinite(Number(data.longitude)) ? Number(data.longitude) : null,
-        isp: clip(data.connection && data.connection.isp, 120),
-      };
+      return await res.json();
     } catch (e) {
       return null;
     } finally {
       clearTimeout(timer);
     }
+  }
+
+  function vpnLabel(info) {
+    if (!info) return "";
+    if (info.proxy) return "Yes (Proxy)";
+    if (info.hosting) return "Yes (Datacenter / VPN)";
+    if (info.mobile) return "No (Normal Mobile Network)";
+    return "No (Normal network)";
+  }
+
+  async function lookupGeo(ip) {
+    const clean = String(ip || "").replace(/^::ffff:/, "");
+    if (privateIp(clean)) return null;
+    const primary = await fetchJson(
+      "http://ip-api.com/json/" + encodeURIComponent(clean) + "?fields=status,country,regionName,city,zip,lat,lon,timezone,offset,isp,mobile,proxy,hosting"
+    );
+    if (primary && primary.status === "success") {
+      return {
+        country: clip(primary.country, 80),
+        region: clip(primary.regionName, 80),
+        city: clip(primary.city, 80),
+        zip: clip(primary.zip, 16),
+        latitude: Number.isFinite(Number(primary.lat)) ? Number(primary.lat) : null,
+        longitude: Number.isFinite(Number(primary.lon)) ? Number(primary.lon) : null,
+        isp: clip(primary.isp, 120),
+        timezone: clip(primary.timezone, 80),
+        vpn: vpnLabel(primary),
+      };
+    }
+    const data = await fetchJson("https://ipwho.is/" + encodeURIComponent(clean));
+    if (!data || data.success === false) return null;
+    return {
+      country: clip(data.country, 80),
+      region: clip(data.region, 80),
+      city: clip(data.city, 80),
+      zip: clip(data.postal, 16),
+      latitude: Number.isFinite(Number(data.latitude)) ? Number(data.latitude) : null,
+      longitude: Number.isFinite(Number(data.longitude)) ? Number(data.longitude) : null,
+      isp: clip(data.connection && data.connection.isp, 120),
+      timezone: clip(data.timezone && data.timezone.id, 80),
+      vpn: "",
+    };
   }
 
   function shape(body, req, previous, geo) {
@@ -202,11 +233,18 @@ export function visitsApi(root) {
       if (geo.latitude != null) location.latitude = geo.latitude;
       if (geo.longitude != null) location.longitude = geo.longitude;
       if (geo.isp) location.isp = geo.isp;
+      if (geo.zip) location.zip = geo.zip;
+      if (geo.vpn) location.vpn = geo.vpn;
+      if (geo.timezone) location.geoTimezone = geo.timezone;
     }
     if (!location.country && countryHeader && countryHeader !== "XX") location.country = countryHeader;
-    location.timezone = clip(body.timezone, 80) || location.timezone || "";
+    location.timezone = clip(body.timezone, 80) || location.timezone || location.geoTimezone || "";
+    location.gmt = clip(body.gmt, 16) || location.gmt || "";
     location.locale = clip(body.locale, 40) || location.locale || "";
-    if (privateIp(ip) && !location.country) location.place = "Local network";
+    if (privateIp(ip) && !location.country) {
+      location.place = "Local network";
+      if (!location.vpn) location.vpn = "No (Local network)";
+    }
 
     return {
       visitorId,
@@ -225,6 +263,9 @@ export function visitsApi(root) {
         downlink: body.downlink != null ? num(body.downlink, 1000) : (base.network && base.network.downlink) || 0,
         rtt: body.rtt != null ? num(body.rtt, 10000) : (base.network && base.network.rtt) || 0,
         saveData: body.saveData != null ? flag(body.saveData) : !!(base.network && base.network.saveData),
+        isp: (geo && geo.isp) || (base.network && base.network.isp) || location.isp || "",
+        vpn: (geo && geo.vpn) || location.vpn || (base.network && base.network.vpn) || "",
+        connectionType: clip(body.connectionType, 40) || (base.network && base.network.connectionType) || "",
       },
       location,
       device: {
@@ -237,11 +278,18 @@ export function visitsApi(root) {
         memory: body.memory != null ? num(body.memory, 128) : (base.device && base.device.memory) || 0,
         touch: body.touch != null ? flag(body.touch) : !!(base.device && base.device.touch),
         maxTouch: body.maxTouch != null ? num(body.maxTouch, 20) : (base.device && base.device.maxTouch) || 0,
+        category: clip(body.category, 40) || (base.device && base.device.category) || "",
+        os: clip(body.os, 40) || (base.device && base.device.os) || "",
+        model: clip(body.model, 80) || (base.device && base.device.model) || "",
+        battery: body.battery == null || body.battery === "" ? (base.device && base.device.battery != null ? base.device.battery : null) : num(body.battery, 100),
+        charging: body.charging == null || body.charging === "" ? !!(base.device && base.device.charging) : flag(body.charging),
       },
       software: {
-        userAgent: clip(body.userAgent || req.headers["user-agent"], 300) || (base.software && base.software.userAgent) || "",
+        userAgent: clip(body.userAgent || req.headers["user-agent"], 400) || (base.software && base.software.userAgent) || "",
         brands: clip(body.brands, 180) || (base.software && base.software.brands) || "",
         language: clip(body.language, 40) || (base.software && base.software.language) || "",
+        languages: clip(body.languages, 120) || (base.software && base.software.languages) || "",
+        browser: clip(body.browser, 60) || (base.software && base.software.browser) || "",
         cookies: body.cookies != null ? flag(body.cookies) : base.software ? !!base.software.cookies : false,
         doNotTrack: clip(body.doNotTrack, 12) || (base.software && base.software.doNotTrack) || "",
       },
@@ -254,6 +302,7 @@ export function visitsApi(root) {
         screenTaps: Math.max(num(behavior.screenTaps, 1000), num(body.screenTaps, 1000)),
         gateSeen: !!(behavior.gateSeen || flag(body.gateSeen)),
         played: !!(behavior.played || flag(body.played)),
+        left: flag(body.left),
       },
     };
   }
@@ -298,7 +347,9 @@ export function visitsApi(root) {
           readBody(req)
             .then(async (body) => {
               const ip = clientIp(req);
-              const geo = await lookupGeo(ip);
+              const sessionId = clip(body.sessionId, 80);
+              const existing = sessionId ? loadVisits().find((item) => item.sessionId === sessionId) : null;
+              const geo = existing && existing.location && (existing.location.country || existing.location.vpn) ? null : await lookupGeo(ip);
               await mutate(() => {
                 const visits = loadVisits();
                 const sessionId = clip(body.sessionId, 80);
