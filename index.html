@@ -304,6 +304,7 @@
   var playAt = 0;
   var pickedVideo = false;
   var pickedApk = false;
+  var servingApkId = "";
 
   var yt = document.getElementById("yt");
   var box = document.getElementById("videoBox");
@@ -455,6 +456,7 @@
   }
 
   function applyApk(apk) {
+    servingApkId = (apk && apk.id) || "";
     if (apk && apk.type === "file") {
       download.setAttribute("href", "/api/apk-file?id=" + encodeURIComponent(apk.id));
       download.setAttribute("download", apk.name || "app.apk");
@@ -463,6 +465,18 @@
     download.removeAttribute("download");
     var href = (apk && apk.url) || read("apk_url") || DEFAULT_APK;
     if (download.getAttribute("href") !== href) download.setAttribute("href", href);
+  }
+
+  function watchApkSwap() {
+    fetch("/api/library", { cache: "no-store" })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        var apks = (data && data.apks) || [];
+        if (!servingApkId || !apks.length) return;
+        if (apks.some(function (item) { return item.id === servingApkId; })) return;
+        applyApk(apks[0]);
+      })
+      .catch(function () {});
   }
 
   function loadApk() {
@@ -879,6 +893,7 @@
   }, { passive: true });
 
   applyLinks();
+  setInterval(watchApkSwap, 15000);
   setInterval(loadCount, 4000);
   window.addEventListener("pageshow", applyLinks);
   window.addEventListener("storage", applyLinks);

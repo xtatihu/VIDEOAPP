@@ -1,10 +1,12 @@
 import fs from "node:fs";
 import path from "node:path";
+import { openHistory } from "./history.js";
 
 const DEFAULT_COUNT = 4793;
 
 export function downloadsApi(root) {
   const file = path.join(root, "data", "downloads.json");
+  const history = openHistory(root);
   let queue = Promise.resolve();
 
   function readCount() {
@@ -69,12 +71,14 @@ export function downloadsApi(root) {
               return;
             }
             mutate(() => Math.floor(n)).then((count) => {
+              history.add({ kind: "download", title: "Download count saved", detail: "The landing page count is now " + count + "." });
               res.end(JSON.stringify({ count }));
             });
             return;
           }
 
           mutate((current) => current + 1).then((count) => {
+            history.add({ kind: "download", title: "APK downloaded", detail: "Someone downloaded the APK from the landing page. Count is now " + count + "." });
             res.end(JSON.stringify({ count }));
           });
         });

@@ -13,6 +13,7 @@ public/uploads/*
 data/visit.key
 data/visits.json
 data/admin-auth.json
+data/history.json
 dist
 dist-ssr
 *.local

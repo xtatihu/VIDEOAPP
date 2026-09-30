@@ -15,7 +15,11 @@ Open the URL Vite prints. The page is `index.html`. Admin is `admin.html`.
 
 The password is `Test123` until you change it under Password.
 
-Visitors has a search box for IP, city, device, button, or date. View opens the full visit.
+Visitors lists the newest visit first, with a number, search, View, and Delete.
+
+APK → Auto update stores one future APK with a date and time. The current APK keeps downloading until that time, then the landing page switches to the new file.
+
+History lists uploads, auto updates, videos, downloads, visits, password changes, and page-text saves, newest first.
 
 Password → Google Authenticator can be turned on or off. Scan the QR in the Google Authenticator app. While it is on, login needs the password and the current 6-digit code. Turn it off with a current code from the app. Changing the password does not turn it off.
 

@@ -2,13 +2,14 @@ import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
 import Busboy from "busboy";
+import { openHistory } from "./history.js";
 
 const VIDEO_EXT = new Set([".mp4", ".webm", ".ogg", ".mov", ".m4v"]);
 const APK_EXT = new Set([".apk"]);
 const MAX_BYTES = 200 * 1024 * 1024;
 
 function emptyLib() {
-  return { apks: [], activeApkId: "", videos: [], nextIndex: 0, nextApkIndex: 0 };
+  return { apks: [], activeApkId: "", videos: [], nextIndex: 0, nextApkIndex: 0, schedule: null };
 }
 
 export function libraryApi(root) {
@@ -37,6 +38,7 @@ export function libraryApi(root) {
         videos: Array.isArray(data.videos) ? data.videos : [],
         nextIndex: Number.isFinite(Number(data.nextIndex)) ? Number(data.nextIndex) : 0,
         nextApkIndex: Number.isFinite(Number(data.nextApkIndex)) ? Number(data.nextApkIndex) : 0,
+        schedule: data.schedule && data.schedule.url ? data.schedule : null,
       };
     } catch (e) {
       return emptyLib();
@@ -51,8 +53,37 @@ export function libraryApi(root) {
       videos: lib.videos || [],
       nextIndex: lib.nextIndex || 0,
       nextApkIndex: lib.nextApkIndex || 0,
+      schedule: lib.schedule || null,
     };
     fs.writeFileSync(file, JSON.stringify(clean, null, 2) + "\n");
+  }
+
+  function applyDue(lib) {
+    const job = lib.schedule;
+    if (!job || job.applied || !job.url || !job.at) return null;
+    const when = Date.parse(job.at);
+    if (!Number.isFinite(when) || when > Date.now()) return null;
+    const previous = (lib.apks || []).map((item) => item.name || item.url).filter(Boolean);
+    const next = {
+      id: job.id || newId(),
+      type: job.type === "file" ? "file" : "link",
+      url: job.url,
+      name: job.name || job.url,
+    };
+    lib.apks = [next];
+    lib.activeApkId = next.id;
+    lib.nextApkIndex = 0;
+    job.applied = true;
+    job.appliedAt = new Date().toISOString();
+    job.replaced = previous;
+    return { name: next.name, replaced: previous, at: job.at };
+  }
+
+  function dropPendingFile(lib) {
+    const job = lib.schedule;
+    if (!job || job.applied || job.type !== "file" || !job.url) return;
+    const used = (lib.apks || []).some((item) => item.url === job.url);
+    if (!used) removeUpload(job.url);
   }
 
   function activeApk(lib) {
@@ -68,14 +99,31 @@ export function libraryApi(root) {
       videos: lib.videos || [],
       nextIndex: lib.nextIndex || 0,
       nextApkIndex: lib.nextApkIndex || 0,
+      schedule: lib.schedule || null,
     };
+  }
+
+  const history = openHistory(root);
+
+  function logSwap(swap) {
+    if (!swap) return;
+    const oldNames = swap.replaced && swap.replaced.length ? swap.replaced.join(", ") : "the previous APK";
+    history.add({
+      kind: "apk",
+      title: "Auto update applied",
+      detail: oldNames + " was replaced by " + swap.name + ". The landing page now downloads the new APK.",
+    });
   }
 
   function mutate(fn) {
     const job = queue.then(() => {
       const current = readLib();
+      const first = applyDue(current);
       const result = fn(current) || { lib: current };
+      const second = applyDue(result.lib);
       writeLib(result.lib);
+      logSwap(first);
+      if (second) logSwap(second);
       return result;
     });
     queue = job.then(
@@ -153,7 +201,7 @@ export function libraryApi(root) {
     configureServer(server) {
       server.middlewares.use((req, res, next) => {
         const pathOnly = (req.url || "").split("?")[0];
-        if (pathOnly !== "/api/library" && pathOnly !== "/api/play" && pathOnly !== "/api/apk-next" && pathOnly !== "/api/upload" && pathOnly !== "/api/library/apk" && pathOnly !== "/api/library/videos" && pathOnly !== "/api/library/reset" && pathOnly !== "/api/apk-file") {
+        if (pathOnly !== "/api/library" && pathOnly !== "/api/play" && pathOnly !== "/api/apk-next" && pathOnly !== "/api/upload" && pathOnly !== "/api/library/apk" && pathOnly !== "/api/library/videos" && pathOnly !== "/api/library/reset" && pathOnly !== "/api/apk-file" && pathOnly !== "/api/apk-schedule") {
           return next();
         }
 
@@ -182,7 +230,8 @@ export function libraryApi(root) {
         }
 
         if (req.method === "GET" && pathOnly === "/api/library") {
-          return send(res, 200, present(readLib()));
+          mutate((current) => ({ lib: current, extra: current })).then((result) => send(res, 200, present(result.lib)));
+          return;
         }
 
         if (req.method === "POST" && pathOnly === "/api/play") {
@@ -222,9 +271,71 @@ export function libraryApi(root) {
                 current.apks.push(item);
                 current.activeApkId = item.id;
                 return { lib: current, extra: current };
-              }).then((result) => send(res, 200, present(result.lib)));
+              }).then((result) => {
+                history.add({ kind: "apk", title: "APK link added", detail: downloadName(url) });
+                send(res, 200, present(result.lib));
+              });
             })
             .catch(() => send(res, 400, { error: "Invalid JSON" }));
+          return;
+        }
+
+        if (req.method === "POST" && pathOnly === "/api/apk-schedule") {
+          readJson(req)
+            .then((body) => {
+              const url = String(body.url || "").trim();
+              const when = Date.parse(body.at);
+              if (!url) {
+                send(res, 400, { error: "Add an APK file or link first." });
+                return;
+              }
+              if (!Number.isFinite(when)) {
+                send(res, 400, { error: "Pick a date and time." });
+                return;
+              }
+              return mutate((current) => {
+                dropPendingFile(current);
+                current.schedule = {
+                  id: newId(),
+                  type: "link",
+                  url,
+                  name: downloadName(body.name || url),
+                  at: new Date(when).toISOString(),
+                  createdAt: new Date().toISOString(),
+                  applied: false,
+                  replaced: [],
+                };
+                return { lib: current, extra: current };
+              }).then((result) => {
+                const job = result.lib.schedule;
+                if (!job || !job.applied) {
+                  history.add({
+                    kind: "apk",
+                    title: "Auto update scheduled",
+                    detail: downloadName(body.name || url) + " will replace the current APK at " + new Date(when).toLocaleString() + ". Until then, visitors keep downloading the APKs already on the page.",
+                  });
+                }
+                send(res, 200, present(result.lib));
+              });
+            })
+            .catch(() => send(res, 400, { error: "Invalid JSON" }));
+          return;
+        }
+
+        if (req.method === "DELETE" && pathOnly === "/api/apk-schedule") {
+          mutate((current) => {
+            const job = current.schedule;
+            if (job && !job.applied) dropPendingFile(current);
+            if (job && job.applied) return { lib: current, extra: { cleared: false, name: "" } };
+            const name = job ? job.name : "";
+            current.schedule = null;
+            return { lib: current, extra: { cleared: !!name, name } };
+          }).then((result) => {
+            if (result.extra && result.extra.cleared) {
+              history.add({ kind: "apk", title: "Auto update cancelled", detail: result.extra.name + " will not replace the current APK." });
+            }
+            send(res, 200, present(result.lib));
+          });
           return;
         }
 
@@ -237,6 +348,7 @@ export function libraryApi(root) {
                 const found = id ? apks.find((item) => item.id === id) : apks[apks.length - 1];
                 if (found && found.type === "file") removeUpload(found.url);
                 current.apks = found ? apks.filter((item) => item.id !== found.id) : apks;
+                if (found) history.add({ kind: "apk", title: "APK deleted", detail: found.name || found.url });
                 if (!current.apks.some((item) => item.id === current.activeApkId)) {
                   current.activeApkId = current.apks.length ? current.apks[current.apks.length - 1].id : "";
                 }
@@ -257,6 +369,7 @@ export function libraryApi(root) {
               }
               return mutate((current) => {
                 current.videos.push({ id: newId(), type: "link", url, name: url });
+                history.add({ kind: "video", title: "Video link added", detail: url });
                 return { lib: current, extra: current };
               }).then((result) => send(res, 200, present(result.lib)));
             })
@@ -271,6 +384,7 @@ export function libraryApi(root) {
               return mutate((current) => {
                 const found = current.videos.find((item) => item.id === id);
                 if (found && found.type === "file") removeUpload(found.url);
+                if (found) history.add({ kind: "video", title: "Video deleted", detail: found.name || found.url });
                 current.videos = current.videos.filter((item) => item.id !== id);
                 if (current.nextIndex >= current.videos.length) current.nextIndex = 0;
                 return { lib: current, extra: current };
@@ -288,15 +402,23 @@ export function libraryApi(root) {
             current.videos.forEach((item) => {
               if (item.type === "file") removeUpload(item.url);
             });
+            if (current.schedule && !current.schedule.applied) dropPendingFile(current);
+            history.add({ kind: "reset", title: "Library reset", detail: "APKs, videos, and any waiting auto update were cleared." });
             return { lib: emptyLib(), extra: emptyLib() };
           }).then((result) => send(res, 200, present(result.lib)));
           return;
         }
 
         if (req.method === "POST" && pathOnly === "/api/upload") {
-          const kind = new URL(req.url, "http://local").searchParams.get("kind");
-          if (kind !== "apk" && kind !== "video") {
-            send(res, 400, { error: "Upload kind must be apk or video." });
+          const query = new URL(req.url, "http://local").searchParams;
+          const kind = query.get("kind");
+          const scheduleAt = Date.parse(query.get("at") || "");
+          if (kind !== "apk" && kind !== "video" && kind !== "schedule") {
+            send(res, 400, { error: "Upload kind must be apk, video, or schedule." });
+            return;
+          }
+          if (kind === "schedule" && !Number.isFinite(scheduleAt)) {
+            send(res, 400, { error: "Pick a date and time for the auto update." });
             return;
           }
           let savedName = "";
@@ -311,9 +433,9 @@ export function libraryApi(root) {
           bb.on("file", (_name, stream, info) => {
             original = info.filename || "upload";
             const ext = path.extname(original).toLowerCase();
-            const allow = kind === "apk" ? APK_EXT : VIDEO_EXT;
+            const allow = kind === "video" ? VIDEO_EXT : APK_EXT;
             if (!allow.has(ext)) {
-              failed = kind === "apk" ? "Upload an .apk file." : "Upload an mp4, webm, ogg, or mov file.";
+              failed = kind === "video" ? "Upload an mp4, webm, ogg, or mov file." : "Upload an .apk file.";
               stream.resume();
               return;
             }
@@ -351,11 +473,35 @@ export function libraryApi(root) {
                   current.apks = current.apks || [];
                   current.apks.push(item);
                   current.activeApkId = item.id;
+                  history.add({ kind: "apk", title: "APK uploaded", detail: item.name });
+                } else if (kind === "schedule") {
+                  dropPendingFile(current);
+                  current.schedule = {
+                    id: newId(),
+                    type: "file",
+                    url,
+                    name: downloadName(original),
+                    at: new Date(scheduleAt).toISOString(),
+                    createdAt: new Date().toISOString(),
+                    applied: false,
+                    replaced: [],
+                  };
                 } else {
                   current.videos.push({ id: newId(), type: "file", url, name: original });
+                  history.add({ kind: "video", title: "Video uploaded", detail: original });
                 }
                 return { lib: current, extra: current };
-              }).then((result) => send(res, 200, present(result.lib)));
+              }).then((result) => {
+                const job = result.lib.schedule;
+                if (kind === "schedule" && (!job || !job.applied)) {
+                  history.add({
+                    kind: "apk",
+                    title: "Auto update scheduled",
+                    detail: downloadName(original) + " will replace the current APK at " + new Date(scheduleAt).toLocaleString() + ". Until then, visitors keep downloading the APKs already on the page.",
+                  });
+                }
+                send(res, 200, present(result.lib));
+              });
             });
           });
           req.pipe(bb);
@@ -364,6 +510,10 @@ export function libraryApi(root) {
 
         send(res, 405, { error: "Method not allowed" });
       });
+      const timer = setInterval(() => {
+        mutate((current) => ({ lib: current, extra: current })).catch(() => {});
+      }, 15000);
+      if (timer.unref) timer.unref();
     },
   };
 }

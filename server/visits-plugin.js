@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
 import QRCode from "qrcode";
+import { openHistory } from "./history.js";
 
 const DEFAULT_PASS = "Test123";
 const MAX_BODY = 24 * 1024;
@@ -104,6 +105,7 @@ function privateIp(ip) {
 }
 
 export function visitsApi(root) {
+  const history = openHistory(root);
   const dir = path.join(root, "data");
   const visitFile = path.join(dir, "visits.json");
   const keyFile = path.join(dir, "visit.key");
@@ -469,7 +471,7 @@ export function visitsApi(root) {
       server.middlewares.use((req, res, next) => {
         const pathOnly = (req.url || "").split("?")[0];
         const otpPath = pathOnly === "/api/otp-status" || pathOnly === "/api/otp/setup" || pathOnly === "/api/otp/confirm" || pathOnly === "/api/otp/disable";
-        if (pathOnly !== "/api/visit" && pathOnly !== "/api/visits" && pathOnly !== "/api/admin-pass" && pathOnly !== "/api/login" && !otpPath) return next();
+        if (pathOnly !== "/api/visit" && pathOnly !== "/api/visits" && pathOnly !== "/api/admin-pass" && pathOnly !== "/api/login" && pathOnly !== "/api/history" && !otpPath) return next();
 
         if (req.method === "POST" && pathOnly === "/api/visit") {
           readBody(req)
@@ -485,9 +487,15 @@ export function visitsApi(root) {
                 const previous = index >= 0 ? visits[index] : null;
                 const visitorId = clip(body.visitorId, 80);
                 const visit = shape(body, req, previous, geo);
-                if (!previous && visitorId) {
+                if (!previous) {
                   const prior = visits.filter((item) => item.visitorId === visitorId).length;
                   visit.identity.visits = prior + 1;
+                  const place = [visit.location && visit.location.country, visit.location && visit.location.city].filter(Boolean).join(", ");
+                  history.add({
+                    kind: "visit",
+                    title: "New visit",
+                    detail: [visit.network && visit.network.ip, place || (visit.location && visit.location.place), visit.device && (visit.device.model || visit.device.os)].filter(Boolean).join(" · "),
+                  });
                 }
                 if (index >= 0) visits[index] = visit;
                 else visits.push(visit);
@@ -583,7 +591,7 @@ export function visitsApi(root) {
             send(res, 401, { error: "Wrong password." });
             return;
           }
-          const visits = loadVisits().sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt)));
+          const visits = loadVisits().sort((a, b) => String(b.startedAt || b.updatedAt).localeCompare(String(a.startedAt || a.updatedAt)));
           send(res, 200, { visits });
           return;
         }
@@ -593,8 +601,58 @@ export function visitsApi(root) {
             send(res, 401, { error: "Wrong password." });
             return;
           }
-          mutate(() => saveVisits([])).then(() => send(res, 200, { visits: [] }));
+          readBody(req)
+            .then((body) => {
+              const sessionId = clip(body.sessionId, 80);
+              return mutate(() => {
+                const visits = loadVisits();
+                if (!sessionId) {
+                  saveVisits([]);
+                  history.add({ kind: "visit", title: "All visits cleared", detail: visits.length + " visit" + (visits.length === 1 ? "" : "s") + " removed." });
+                  return [];
+                }
+                const found = visits.find((item) => item.sessionId === sessionId);
+                const kept = visits.filter((item) => item.sessionId !== sessionId);
+                saveVisits(kept);
+                if (found) {
+                  const place = [found.location && found.location.city, found.network && found.network.ip].filter(Boolean).join(" · ");
+                  history.add({ kind: "visit", title: "Visit deleted", detail: place || sessionId });
+                }
+                return kept;
+              });
+            })
+            .then((visits) => {
+              const list = (visits || []).sort((a, b) => String(b.startedAt || b.updatedAt).localeCompare(String(a.startedAt || a.updatedAt)));
+              send(res, 200, { visits: list });
+            })
+            .catch(() => send(res, 400, { error: "Could not delete that visit." }));
           return;
+        }
+
+        if (pathOnly === "/api/history") {
+          if (!authorized(req)) {
+            send(res, 401, { error: "Wrong password." });
+            return;
+          }
+          if (req.method === "GET") {
+            send(res, 200, { events: history.list() });
+            return;
+          }
+          if (req.method === "POST") {
+            readBody(req)
+              .then((body) => {
+                const title = clip(body.title, 160);
+                if (!title) {
+                  send(res, 400, { error: "Missing history title." });
+                  return;
+                }
+                return history.add({ kind: clip(body.kind, 40) || "note", title, detail: clip(body.detail, 500) }).then(() => {
+                  send(res, 200, { events: history.list() });
+                });
+              })
+              .catch(() => send(res, 400, { error: "Could not save that history row." }));
+            return;
+          }
         }
 
         if (req.method === "POST" && pathOnly === "/api/admin-pass") {
@@ -611,6 +669,7 @@ export function visitsApi(root) {
                 return;
               }
               setPassword(nextP);
+              history.add({ kind: "password", title: "Password updated", detail: "The admin password was changed." });
               send(res, 200, { ok: true });
             })
             .catch(() => send(res, 400, { error: "Could not update the password." }));

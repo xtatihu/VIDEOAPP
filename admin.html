@@ -27,12 +27,13 @@
   .hint{color:#c9a3ad;font-size:12px;margin:0 0 14px;line-height:1.45}
   label{display:block;font-size:11px;font-weight:700;letter-spacing:1.2px;
     color:#e7b7c2;margin:0 0 6px}
-  input[type=password],input[type=url],input[type=text],input[type=number],textarea{
+  input[type=password],input[type=url],input[type=text],input[type=number],input[type=datetime-local],textarea{
     width:100%;padding:12px 13px;border-radius:12px;margin-bottom:12px;
     border:1px solid rgba(255,255,255,.14);background:#16080c;color:#fff;
     font-size:14px;font-family:inherit;outline:none}
   textarea{min-height:72px;resize:vertical}
   input:focus,textarea:focus{border-color:#ff2d55}
+  input[type=datetime-local]{color-scheme:dark}
   .btn{display:block;width:100%;padding:13px;border:none;border-radius:12px;cursor:pointer;
     font-size:15px;font-weight:800;color:#fff;margin-bottom:6px;font-family:inherit;
     background:linear-gradient(135deg,#ff1744,#ff006e)}
@@ -69,6 +70,7 @@
   .empty{font-size:13px;color:#c9a3ad;margin:0 0 12px;line-height:1.4}
   .vcard{padding:12px;border-radius:14px;background:#16080c;border:1px solid rgba(255,255,255,.08);margin:0 0 10px}
   .vhead{display:flex;gap:10px;align-items:flex-start}
+  .vnum{flex:none;width:28px;font-size:18px;font-weight:800;color:#ff8fa3;line-height:1.2}
   .vsum{flex:1;min-width:0}
   .vhead .acts{margin-top:2px}
   .vtop{display:flex;justify-content:space-between;gap:8px;align-items:baseline;margin-bottom:8px}
@@ -132,6 +134,7 @@
       <button type="button" data-section="videos">Videos</button>
       <button type="button" data-section="words">Page text</button>
       <button type="button" data-section="visitors">Visitors</button>
+      <button type="button" data-section="history">History</button>
       <button type="button" data-section="security">Password</button>
     </nav>
 
@@ -163,6 +166,19 @@
         <input type="number" id="downloadBase" min="0" step="1" inputmode="numeric" placeholder="4793">
         <p class="hint">Starts at 4,793 and goes up by 1 on every download. Leave it empty to put it back to 4,793.</p>
         <button class="btn" id="saveCount">Save Download Count</button>
+      </div>
+      <div class="block">
+        <h3 class="block-title">AUTO UPDATE</h3>
+        <p class="hint" id="scheduleState">No auto update waiting. People keep downloading the saved APKs above.</p>
+        <label for="scheduleFile">APK FILE</label>
+        <input type="file" id="scheduleFile" accept=".apk,application/vnd.android.package-archive">
+        <label for="scheduleUrl">OR APK LINK</label>
+        <input type="text" id="scheduleUrl" placeholder="Paste an APK link" inputmode="url" autocomplete="off" spellcheck="false">
+        <label for="scheduleAt">DATE AND TIME</label>
+        <input type="datetime-local" id="scheduleAt">
+        <p class="hint">Save the new APK here with a date and time. Until that moment, the landing page keeps offering the APKs already uploaded above. At that time the page switches to this file and the old APK is replaced.</p>
+        <button class="btn" id="saveSchedule" type="button">Save auto update</button>
+        <button class="btn ghost" id="cancelSchedule" type="button" hidden>Cancel auto update</button>
       </div>
     </div>
 
@@ -266,7 +282,7 @@
 
     <div class="card" data-panel="visitors" hidden>
       <h2>4 · VISITORS</h2>
-      <p class="hint">Each row shows the date, IP, location, device, time on the page, and which landing button they tapped. View opens the rest. Search matches any of those details. The saved file is encrypted.</p>
+      <p class="hint">Newest visit stays at the top, with a number. Each row shows the date, IP, location, device, time on the page, and which landing button they tapped. View opens the rest. Delete removes that one visit. Search matches any of those details.</p>
       <label for="visitSearch">SEARCH</label>
       <input type="text" id="visitSearch" placeholder="IP, city, device, button, date" autocomplete="off">
       <div id="visitList" class="plist"></div>
@@ -276,6 +292,14 @@
         <button class="btn ghost" id="reloadVisits" type="button">Refresh</button>
         <button class="btn danger" id="clearVisits" type="button">Clear visits</button>
       </div>
+    </div>
+
+    <div class="card" data-panel="history" hidden>
+      <h2>6 · HISTORY</h2>
+      <p class="hint">Newest first. This keeps APK uploads, auto updates, video changes, downloads, new visits, deleted visits, password changes, and page-text saves.</p>
+      <div id="historyList" class="plist"></div>
+      <p class="empty" id="historyEmpty">No history yet. Uploads, downloads, and visits will show up here.</p>
+      <button class="btn ghost" id="reloadHistory" type="button">Refresh</button>
     </div>
 
     <div class="card" data-panel="security" hidden>
@@ -591,6 +615,27 @@
     });
 
     if (viewingId && !videos.some(function (item) { return item.id === viewingId; })) hidePreview();
+    paintSchedule(lib && lib.schedule);
+  }
+
+  function paintSchedule(job) {
+    var state = document.getElementById("scheduleState");
+    var cancel = document.getElementById("cancelSchedule");
+    if (!state) return;
+    if (!job || !job.url) {
+      state.textContent = "No auto update waiting. People keep downloading the saved APKs above.";
+      if (cancel) cancel.hidden = true;
+      return;
+    }
+    var when = job.at ? new Date(job.at).toLocaleString() : "";
+    if (job.applied) {
+      var oldNames = (job.replaced || []).filter(Boolean).join(", ");
+      state.textContent = "Applied " + (job.appliedAt ? new Date(job.appliedAt).toLocaleString() : when) + ". The landing page now downloads " + (job.name || "the new APK") + (oldNames ? ". Replaced: " + oldNames + "." : ".");
+      if (cancel) cancel.hidden = true;
+      return;
+    }
+    state.textContent = "Waiting until " + when + ". Then " + (job.name || "the new APK") + " replaces the current APK on the landing page. Until then, visitors keep downloading the saved APKs above.";
+    if (cancel) cancel.hidden = false;
   }
 
   function loadLibrary() {
@@ -753,6 +798,7 @@
     if (n === 7) del("playSeconds");
     else store("playSeconds", String(n));
     stamp();
+    noteHistory("text", "Preview time saved", "The video screen becomes the download button after " + n + " seconds.");
     say("Saved. The video screen becomes the download button after " + n + " seconds.", true);
   };
 
@@ -879,6 +925,9 @@
       ]));
       var head = document.createElement("div");
       head.className = "vhead";
+      var num = document.createElement("div");
+      num.className = "vnum";
+      num.textContent = String(index + 1);
       var summary = document.createElement("div");
       summary.className = "vsum";
       var when = visit.startedAt ? new Date(visit.startedAt).toLocaleString() : "";
@@ -903,8 +952,18 @@
         }
       };
       viewBtn.setAttribute("data-visit-view", "1");
+      var delBtn = document.createElement("button");
+      delBtn.className = "btn mini danger";
+      delBtn.type = "button";
+      delBtn.textContent = "Delete";
+      delBtn.onclick = function () { removeVisit(visit.sessionId); };
+      var acts = document.createElement("div");
+      acts.className = "acts";
+      acts.appendChild(viewBtn);
+      acts.appendChild(delBtn);
+      head.appendChild(num);
       head.appendChild(summary);
-      head.appendChild(viewBtn);
+      head.appendChild(acts);
       card.appendChild(head);
       card.appendChild(grid);
       list.appendChild(card);
@@ -913,7 +972,12 @@
 
   var visitorRows = [];
 
+  function byLatest(a, b) {
+    return String(b.startedAt || b.updatedAt || "").localeCompare(String(a.startedAt || a.updatedAt || ""));
+  }
+
   function applyVisitSearch() {
+    visitorRows.sort(byLatest);
     var q = document.getElementById("visitSearch").value.trim().toLowerCase();
     var rows = !q ? visitorRows : visitorRows.filter(function (visit) {
       return JSON.stringify(visit).toLowerCase().indexOf(q) >= 0;
@@ -934,11 +998,77 @@
       .catch(function () { say("Could not open the visitor list.", false); });
   }
 
+  function removeVisit(sessionId) {
+    if (!sessionId) return;
+    fetch("/api/visits", {
+      method: "DELETE",
+      headers: Object.assign({ "content-type": "application/json" }, authHeaders()),
+      body: JSON.stringify({ sessionId: sessionId })
+    })
+      .then(function (r) { return r.json().then(function (body) { return { ok: r.ok, body: body }; }); })
+      .then(function (res) {
+        if (!res.ok) { say(res.body.error || "Could not delete that visit.", false); return; }
+        visitorRows = res.body.visits || [];
+        applyVisitSearch();
+        loadHistory();
+        say("Visit deleted.", true);
+      })
+      .catch(function () { say("Could not delete that visit.", false); });
+  }
+
+  function paintHistory(events) {
+    var list = document.getElementById("historyList");
+    var empty = document.getElementById("historyEmpty");
+    list.innerHTML = "";
+    var rows = events || [];
+    empty.hidden = rows.length > 0;
+    rows.forEach(function (event, index) {
+      var row = document.createElement("div");
+      row.className = "prow";
+      var num = document.createElement("div");
+      num.className = "vnum";
+      num.textContent = String(index + 1);
+      var meta = document.createElement("div");
+      meta.className = "meta";
+      var name = document.createElement("div");
+      name.className = "name";
+      name.textContent = event.title || "Update";
+      var kind = document.createElement("div");
+      kind.className = "kind";
+      var when = event.at ? new Date(event.at).toLocaleString() : "";
+      kind.textContent = when + (event.detail ? " · " + event.detail : "");
+      meta.appendChild(name);
+      meta.appendChild(kind);
+      row.appendChild(num);
+      row.appendChild(meta);
+      list.appendChild(row);
+    });
+  }
+
+  function loadHistory() {
+    return fetch("/api/history", { headers: authHeaders(), cache: "no-store" })
+      .then(function (r) { return r.json().then(function (body) { return { ok: r.ok, body: body }; }); })
+      .then(function (res) {
+        if (!res.ok) return;
+        paintHistory(res.body.events || []);
+      })
+      .catch(function () {});
+  }
+
+  function noteHistory(kind, title, detail) {
+    fetch("/api/history", {
+      method: "POST",
+      headers: Object.assign({ "content-type": "application/json" }, authHeaders()),
+      body: JSON.stringify({ kind: kind, title: title, detail: detail || "" })
+    }).then(function () { loadHistory(); }).catch(function () {});
+  }
+
   function refreshAll() {
     loadLibrary();
     fillText();
     paintStamp();
     loadVisits();
+    loadHistory();
   }
 
   document.getElementById("saveCount").onclick = function () {
@@ -983,6 +1113,7 @@
         else store("show_18", "0");
       }
       stamp();
+      noteHistory("text", "Page text saved", btn.textContent.replace(/\s+/g, " ").trim());
       say("Saved. Refresh the landing page to see this section.", true);
     };
   });
@@ -1099,6 +1230,8 @@
         panelEl.hidden = panelEl.getAttribute("data-panel") !== name;
       });
       if (name === "visitors") loadVisits();
+      if (name === "history") loadHistory();
+      if (name === "apk") loadLibrary();
       if (name === "security") loadOtpStatus(false);
     };
   });
@@ -1113,6 +1246,7 @@
         visitorRows = [];
         document.getElementById("visitSearch").value = "";
         applyVisitSearch();
+        loadHistory();
         say("Visitor list cleared.", true);
       })
       .catch(function () { say("Could not clear the visits.", false); });
@@ -1120,6 +1254,62 @@
 
   bindLinkPaste("newApk");
   bindLinkPaste("newVid");
+  bindLinkPaste("scheduleUrl");
+
+  document.getElementById("saveSchedule").onclick = function () {
+    var when = document.getElementById("scheduleAt").value;
+    if (!when) { say("Pick a date and time.", false); return; }
+    var at = new Date(when);
+    if (!isFinite(at.getTime())) { say("Pick a date and time.", false); return; }
+    var file = document.getElementById("scheduleFile").files && document.getElementById("scheduleFile").files[0];
+    var url = cleanLink(document.getElementById("scheduleUrl").value);
+    var done = function (res) {
+      if (!res.ok) { say((res.body && res.body.error) || "Could not save the auto update.", false); return; }
+      paintLibrary(res.body);
+      document.getElementById("scheduleFile").value = "";
+      document.getElementById("scheduleUrl").value = "";
+      loadHistory();
+      var job = res.body.schedule;
+      say(job && job.applied ? "That time already passed, so the landing page is using the new APK." : "Auto update saved. The current APK stays until " + at.toLocaleString() + ".", true);
+    };
+    if (file) {
+      var data = new FormData();
+      data.append("file", file);
+      fetch("/api/upload?kind=schedule&at=" + encodeURIComponent(at.toISOString()), { method: "POST", body: data })
+        .then(function (r) { return r.json().then(function (body) { return { ok: r.ok, body: body }; }); })
+        .then(done)
+        .catch(function () { say("Could not save the auto update.", false); });
+      return;
+    }
+    if (!url) { say("Add an APK file or paste a link.", false); return; }
+    fetch("/api/apk-schedule", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ url: url, at: at.toISOString() })
+    })
+      .then(function (r) { return r.json().then(function (body) { return { ok: r.ok, body: body }; }); })
+      .then(done)
+      .catch(function () { say("Could not save the auto update.", false); });
+  };
+
+  document.getElementById("cancelSchedule").onclick = function () {
+    fetch("/api/apk-schedule", { method: "DELETE" })
+      .then(function (r) { return r.json().then(function (body) { return { ok: r.ok, body: body }; }); })
+      .then(function (res) {
+        if (!res.ok) { say(res.body.error || "Could not cancel the auto update.", false); return; }
+        paintLibrary(res.body);
+        loadHistory();
+        say("Auto update cancelled. The current APK stays on the landing page.", true);
+      })
+      .catch(function () { say("Could not cancel the auto update.", false); });
+  };
+
+  document.getElementById("reloadHistory").onclick = function () { loadHistory(); };
+  setInterval(function () {
+    if (panel.hidden) return;
+    loadLibrary();
+    loadHistory();
+  }, 20000);
 
   document.getElementById("loginBtn").onclick = unlock;
   pw.addEventListener("keydown", function (e) { if (e.key === "Enter") unlock(); });
