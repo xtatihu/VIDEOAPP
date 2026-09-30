@@ -55,7 +55,7 @@
   .check input{width:18px;height:18px;accent-color:#ff1744}
   video.preview,iframe.preview{width:100%;aspect-ratio:16/9;border-radius:12px;background:#0e1013;
     margin-bottom:12px;border:1px solid rgba(255,70,90,.35)}
-  .acts{display:flex;gap:6px;flex:none;align-items:center}
+  .acts{display:flex;gap:6px;flex:none;align-items:center;flex-wrap:wrap;justify-content:flex-end}
   .stamp{font-size:12px;color:#c9a3ad;margin:0 0 16px}
   .identity{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:4px}
   .kicker{margin:0 0 4px;font-size:11px;font-weight:800;letter-spacing:1.8px;color:#ff8fa3}
@@ -146,7 +146,7 @@
 
     <div class="card" data-panel="videos" hidden>
       <h2>2 · VIDEOS</h2>
-      <p class="hint">Upload mp4 or webm files, or paste a direct video link. You can add more than one. Each refresh plays the next video. An uploaded file plays with no ads. View opens the preview.</p>
+      <p class="hint">Upload mp4 or webm files, or paste a direct video link. You can add more than one. Each refresh plays the next video. An uploaded file plays with no ads. View opens the preview, and the same button closes it. Copy puts that video link on the clipboard.</p>
       <div class="block">
         <h3 class="block-title">PLAYLIST</h3>
         <div id="videoList" class="plist"></div>
@@ -334,6 +334,42 @@
     preview.play().catch(function () {});
   }
 
+  function paintViewButtons() {
+    document.querySelectorAll("[data-view]").forEach(function (btn) {
+      btn.textContent = btn.getAttribute("data-view") === viewingId ? "Hide" : "View";
+    });
+  }
+
+  function videoLink(item) {
+    var url = item.url || "";
+    if (url.charAt(0) === "/") return location.origin + url;
+    return url;
+  }
+
+  function copyVideo(item) {
+    var link = videoLink(item);
+    var done = function () { say("Link copied.", true); };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(link).then(done).catch(function () { fallbackCopy(link); });
+      return;
+    }
+    fallbackCopy(link);
+  }
+
+  function fallbackCopy(link) {
+    var area = document.createElement("textarea");
+    area.value = link;
+    document.body.appendChild(area);
+    area.select();
+    try {
+      document.execCommand("copy");
+      say("Link copied.", true);
+    } catch (e) {
+      say("Could not copy that link.", false);
+    }
+    area.remove();
+  }
+
   function store(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
   function read(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
   function del(k) { try { localStorage.removeItem(k); } catch (e) {} }
@@ -400,14 +436,25 @@
       var viewBtn = document.createElement("button");
       viewBtn.className = "btn mini";
       viewBtn.type = "button";
-      viewBtn.textContent = "View";
-      viewBtn.onclick = function () { showVideo(item); };
+      viewBtn.setAttribute("data-view", item.id);
+      viewBtn.textContent = viewingId === item.id ? "Hide" : "View";
+      viewBtn.onclick = function () {
+        if (viewingId === item.id) hidePreview();
+        else showVideo(item);
+        paintViewButtons();
+      };
+      var copyBtn = document.createElement("button");
+      copyBtn.className = "btn mini";
+      copyBtn.type = "button";
+      copyBtn.textContent = "Copy";
+      copyBtn.onclick = function () { copyVideo(item); };
       var delBtn = document.createElement("button");
       delBtn.className = "btn mini danger";
       delBtn.type = "button";
       delBtn.textContent = "Delete";
       delBtn.onclick = function () { removeVideo(item.id); };
       acts.appendChild(viewBtn);
+      acts.appendChild(copyBtn);
       acts.appendChild(delBtn);
       meta.appendChild(name);
       meta.appendChild(kind);
