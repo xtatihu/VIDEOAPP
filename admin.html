@@ -64,6 +64,7 @@
   .prow .name{font-size:13px;font-weight:700;word-break:break-all}
   .prow .kind{font-size:11px;color:#e7b7c2;margin-top:2px}
   .mini{flex:none;width:auto;padding:8px 12px;margin:0;font-size:12px;border-radius:10px;background:rgba(255,255,255,.08)}
+  .mini.danger{background:transparent;color:#ffb4c0;border:1px solid rgba(255,90,110,.75)}
   .empty{font-size:13px;color:#c9a3ad;margin:0 0 12px;line-height:1.4}
   input[type=file]{width:100%;margin-bottom:12px;font-size:13px;color:#f3d5dc}
   .choice{display:grid;grid-template-columns:1fr 1fr;gap:12px}
@@ -113,30 +114,25 @@
 
     <div class="card" data-panel="apk">
       <h2>1 · APK DOWNLOAD</h2>
-      <p class="hint">Use a link or upload the APK file. The choice you save last is the one customers download.</p>
+      <p class="hint">Add more than one APK. Choosing files uploads them right away. Delete sits on the same row. Customers download the latest file, under that file's own name.</p>
       <div class="block">
-        <h3 class="block-title">ACTIVE FILE</h3>
-        <div class="current" id="curApk">Not set — the button uses /download</div>
+        <h3 class="block-title">SAVED APKS</h3>
+        <div id="apkList" class="plist"></div>
+        <p class="empty" id="apkEmpty">No APK yet. The button uses /download until you add one.</p>
       </div>
       <div class="choice">
         <div class="block">
           <h3 class="block-title">LINK</h3>
           <label>APK URL</label>
           <input type="url" id="newApk" placeholder="https://…/app.apk" inputmode="url">
-          <button class="btn" id="saveApk">Save APK Link</button>
+          <button class="btn" id="saveApk">Add APK Link</button>
         </div>
         <div class="block">
           <h3 class="block-title">UPLOAD</h3>
-          <label>APK FILE</label>
-          <input type="file" id="apkFile" accept=".apk,application/vnd.android.package-archive">
+          <label>APK FILES</label>
+          <input type="file" id="apkFile" accept=".apk,application/vnd.android.package-archive" multiple>
           <button class="btn" id="uploadApk">Upload APK</button>
         </div>
-      </div>
-      <div class="block danger-block">
-        <h3 class="block-title">DELETE APK</h3>
-        <p class="hint">This only removes the APK. Videos, page text, and the download count stay as they are.</p>
-        <div class="current" id="apkDeleteName">No APK saved</div>
-        <button class="btn danger" id="deleteApk" type="button" disabled>Delete APK</button>
       </div>
       <div class="block">
         <h3 class="block-title">DOWNLOAD COUNT</h3>
@@ -287,24 +283,36 @@
   }
 
   function paintLibrary(lib) {
-    var apk = lib && lib.apk;
-    var cur = document.getElementById("curApk");
-    var delName = document.getElementById("apkDeleteName");
-    var delBtn = document.getElementById("deleteApk");
-    if (!apk || !apk.url) {
-      cur.textContent = "Not set — the button uses /download";
-      delName.textContent = "No APK saved";
-      delBtn.disabled = true;
-    } else if (apk.type === "file") {
-      var fileName = apk.name || "app.apk";
-      cur.textContent = "Customers download this file as " + fileName;
-      delName.textContent = fileName;
-      delBtn.disabled = false;
-    } else {
-      cur.textContent = "Link: " + apk.url;
-      delName.textContent = apk.url;
-      delBtn.disabled = false;
-    }
+    var apks = (lib && lib.apks) || [];
+    var activeId = (lib && lib.activeApkId) || (apks.length ? apks[apks.length - 1].id : "");
+    var apkList = document.getElementById("apkList");
+    var apkEmpty = document.getElementById("apkEmpty");
+    apkEmpty.hidden = apks.length > 0;
+    apkList.innerHTML = "";
+    apks.forEach(function (item, index) {
+      var row = document.createElement("div");
+      row.className = "prow";
+      var meta = document.createElement("div");
+      meta.className = "meta";
+      var name = document.createElement("div");
+      name.className = "name";
+      name.textContent = (index + 1) + ". " + (item.name || item.url);
+      var kind = document.createElement("div");
+      kind.className = "kind";
+      var label = item.type === "file" ? "Uploaded file" : "Link";
+      if (item.id === activeId) label += " · on the download button";
+      kind.textContent = label;
+      var button = document.createElement("button");
+      button.className = "btn mini danger";
+      button.type = "button";
+      button.textContent = "Delete";
+      button.onclick = function () { removeApk(item.id); };
+      meta.appendChild(name);
+      meta.appendChild(kind);
+      row.appendChild(meta);
+      row.appendChild(button);
+      apkList.appendChild(row);
+    });
 
     var videos = (lib && lib.videos) || [];
     var list = document.getElementById("videoList");
@@ -351,6 +359,53 @@
       .catch(function () { say("Could not load the APK and video list.", false); });
   }
 
+  function removeApk(id) {
+    fetch("/api/library/apk", {
+      method: "DELETE",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ id: id })
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (lib) {
+        paintLibrary(lib);
+        stamp();
+        say("APK deleted. The other APKs stay in the list.", true);
+      })
+      .catch(function () { say("Could not delete that APK.", false); });
+  }
+
+  var apkUploading = false;
+  function uploadApkFiles(files) {
+    var list = Array.prototype.slice.call(files || []).filter(Boolean);
+    if (!list.length) { say("Choose an APK file first.", false); return; }
+    if (apkUploading) return;
+    apkUploading = true;
+    var index = 0;
+    var failed = 0;
+    function next() {
+      if (index >= list.length) {
+        apkUploading = false;
+        document.getElementById("apkFile").value = "";
+        loadLibrary();
+        stamp();
+        if (failed) say(failed + " of " + list.length + " APK files could not be uploaded.", false);
+        else if (list.length === 1) say("APK uploaded. Customers download it as " + (list[0].name || "that file") + ".", true);
+        else say(list.length + " APKs uploaded. The latest one is on the download button.", true);
+        return;
+      }
+      var file = list[index];
+      index += 1;
+      var data = new FormData();
+      data.append("file", file);
+      fetch("/api/upload?kind=apk", { method: "POST", body: data })
+        .then(function (r) { return r.json().then(function (body) { return { ok: r.ok, body: body }; }); })
+        .then(function (res) { if (!res.ok) failed += 1; })
+        .catch(function () { failed += 1; })
+        .finally(next);
+    }
+    next();
+  }
+
   function removeVideo(id) {
     fetch("/api/library/videos", {
       method: "DELETE",
@@ -381,40 +436,16 @@
         document.getElementById("newApk").value = "";
         paintLibrary(res.body);
         stamp();
-        say("APK link saved. The download button uses this link.", true);
+        say("APK link added. It is now on the download button.", true);
       })
       .catch(function () { say("Could not save the APK link.", false); });
   };
 
+  document.getElementById("apkFile").addEventListener("change", function () {
+    if (this.files && this.files.length) uploadApkFiles(this.files);
+  });
   document.getElementById("uploadApk").onclick = function () {
-    var file = document.getElementById("apkFile").files[0];
-    if (!file) { say("Choose an APK file first.", false); return; }
-    var data = new FormData();
-    data.append("file", file);
-    fetch("/api/upload?kind=apk", { method: "POST", body: data })
-      .then(function (r) { return r.json().then(function (body) { return { ok: r.ok, body: body }; }); })
-      .then(function (res) {
-        if (!res.ok) { say(res.body.error || "Upload failed.", false); return; }
-        if (res.body.apk && res.body.apk.url) store("apk_url", res.body.apk.url);
-        document.getElementById("apkFile").value = "";
-        paintLibrary(res.body);
-        stamp();
-        say("APK uploaded. Customers download it as " + ((res.body.apk && res.body.apk.name) || "the same file name") + ".", true);
-      })
-      .catch(function () { say("Upload failed.", false); });
-  };
-
-  document.getElementById("deleteApk").onclick = function () {
-    if (document.getElementById("deleteApk").disabled) return;
-    fetch("/api/library/apk", { method: "DELETE" })
-      .then(function (r) { return r.json(); })
-      .then(function (lib) {
-        del("apk_url");
-        paintLibrary(lib);
-        stamp();
-        say("APK deleted. The download button uses /download again.", true);
-      })
-      .catch(function () { say("Could not delete the APK.", false); });
+    uploadApkFiles(document.getElementById("apkFile").files);
   };
 
   document.getElementById("saveVid").onclick = function () {

@@ -8,7 +8,7 @@ const APK_EXT = new Set([".apk"]);
 const MAX_BYTES = 200 * 1024 * 1024;
 
 function emptyLib() {
-  return { apk: null, videos: [], nextIndex: 0 };
+  return { apks: [], activeApkId: "", videos: [], nextIndex: 0 };
 }
 
 export function libraryApi(root) {
@@ -19,8 +19,21 @@ export function libraryApi(root) {
   function readLib() {
     try {
       const data = JSON.parse(fs.readFileSync(file, "utf8"));
+      let apks = Array.isArray(data.apks) ? data.apks.filter((item) => item && item.url) : [];
+      if (!apks.length && data.apk && data.apk.url) apks = [data.apk];
+      apks = apks.map((item) => ({
+        id: item.id || newId(),
+        type: item.type === "file" ? "file" : "link",
+        url: item.url,
+        name: item.name || item.url,
+      }));
+      let activeApkId = data.activeApkId || "";
+      if (!apks.some((item) => item.id === activeApkId)) {
+        activeApkId = apks.length ? apks[apks.length - 1].id : "";
+      }
       return {
-        apk: data.apk || null,
+        apks,
+        activeApkId,
         videos: Array.isArray(data.videos) ? data.videos : [],
         nextIndex: Number.isFinite(Number(data.nextIndex)) ? Number(data.nextIndex) : 0,
       };
@@ -32,11 +45,27 @@ export function libraryApi(root) {
   function writeLib(lib) {
     fs.mkdirSync(path.dirname(file), { recursive: true });
     const clean = {
-      apk: lib.apk || null,
+      apks: lib.apks || [],
+      activeApkId: lib.activeApkId || "",
       videos: lib.videos || [],
       nextIndex: lib.nextIndex || 0,
     };
     fs.writeFileSync(file, JSON.stringify(clean, null, 2) + "\n");
+  }
+
+  function activeApk(lib) {
+    const apks = lib.apks || [];
+    return apks.find((item) => item.id === lib.activeApkId) || apks[apks.length - 1] || null;
+  }
+
+  function present(lib) {
+    return {
+      apks: lib.apks || [],
+      activeApkId: lib.activeApkId || "",
+      apk: activeApk(lib),
+      videos: lib.videos || [],
+      nextIndex: lib.nextIndex || 0,
+    };
   }
 
   function mutate(fn) {
@@ -93,7 +122,7 @@ export function libraryApi(root) {
   }
 
   function sendApkFile(res) {
-    const apk = readLib().apk;
+    const apk = activeApk(readLib());
     if (!apk || apk.type !== "file" || !apk.url) {
       res.statusCode = 404;
       res.end("No APK uploaded");
@@ -129,7 +158,7 @@ export function libraryApi(root) {
         }
 
         if (req.method === "GET" && pathOnly === "/api/library") {
-          return send(res, 200, readLib());
+          return send(res, 200, present(readLib()));
         }
 
         if (req.method === "POST" && pathOnly === "/api/play") {
@@ -164,21 +193,33 @@ export function libraryApi(root) {
                 return;
               }
               return mutate((current) => {
-                if (current.apk && current.apk.type === "file") removeUpload(current.apk.url);
-                current.apk = { type: "link", url, name: url };
+                const item = { id: newId(), type: "link", url, name: downloadName(url) };
+                current.apks = current.apks || [];
+                current.apks.push(item);
+                current.activeApkId = item.id;
                 return { lib: current, extra: current };
-              }).then((result) => send(res, 200, result.lib));
+              }).then((result) => send(res, 200, present(result.lib)));
             })
             .catch(() => send(res, 400, { error: "Invalid JSON" }));
           return;
         }
 
         if (req.method === "DELETE" && pathOnly === "/api/library/apk") {
-          mutate((current) => {
-            if (current.apk && current.apk.type === "file") removeUpload(current.apk.url);
-            current.apk = null;
-            return { lib: current, extra: current };
-          }).then((result) => send(res, 200, result.lib));
+          readJson(req)
+            .then((body) => {
+              const id = String(body.id || "");
+              return mutate((current) => {
+                const apks = current.apks || [];
+                const found = id ? apks.find((item) => item.id === id) : apks[apks.length - 1];
+                if (found && found.type === "file") removeUpload(found.url);
+                current.apks = found ? apks.filter((item) => item.id !== found.id) : apks;
+                if (!current.apks.some((item) => item.id === current.activeApkId)) {
+                  current.activeApkId = current.apks.length ? current.apks[current.apks.length - 1].id : "";
+                }
+                return { lib: current, extra: current };
+              }).then((result) => send(res, 200, present(result.lib)));
+            })
+            .catch(() => send(res, 400, { error: "Invalid JSON" }));
           return;
         }
 
@@ -193,7 +234,7 @@ export function libraryApi(root) {
               return mutate((current) => {
                 current.videos.push({ id: newId(), type: "link", url, name: url });
                 return { lib: current, extra: current };
-              }).then((result) => send(res, 200, result.lib));
+              }).then((result) => send(res, 200, present(result.lib)));
             })
             .catch(() => send(res, 400, { error: "Invalid JSON" }));
           return;
@@ -209,7 +250,7 @@ export function libraryApi(root) {
                 current.videos = current.videos.filter((item) => item.id !== id);
                 if (current.nextIndex >= current.videos.length) current.nextIndex = 0;
                 return { lib: current, extra: current };
-              }).then((result) => send(res, 200, result.lib));
+              }).then((result) => send(res, 200, present(result.lib)));
             })
             .catch(() => send(res, 400, { error: "Invalid JSON" }));
           return;
@@ -217,12 +258,14 @@ export function libraryApi(root) {
 
         if (req.method === "POST" && pathOnly === "/api/library/reset") {
           mutate((current) => {
-            if (current.apk && current.apk.type === "file") removeUpload(current.apk.url);
+            (current.apks || []).forEach((item) => {
+              if (item.type === "file") removeUpload(item.url);
+            });
             current.videos.forEach((item) => {
               if (item.type === "file") removeUpload(item.url);
             });
             return { lib: emptyLib(), extra: emptyLib() };
-          }).then((result) => send(res, 200, result.lib));
+          }).then((result) => send(res, 200, present(result.lib)));
           return;
         }
 
@@ -280,13 +323,15 @@ export function libraryApi(root) {
               const url = "/uploads/" + savedName;
               mutate((current) => {
                 if (kind === "apk") {
-                  if (current.apk && current.apk.type === "file") removeUpload(current.apk.url);
-                  current.apk = { type: "file", url, name: original };
+                  const item = { id: newId(), type: "file", url, name: downloadName(original) };
+                  current.apks = current.apks || [];
+                  current.apks.push(item);
+                  current.activeApkId = item.id;
                 } else {
                   current.videos.push({ id: newId(), type: "file", url, name: original });
                 }
                 return { lib: current, extra: current };
-              }).then((result) => send(res, 200, result.lib));
+              }).then((result) => send(res, 200, present(result.lib)));
             });
           });
           req.pipe(bb);

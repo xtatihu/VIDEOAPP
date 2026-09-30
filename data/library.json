@@ -1,5 +1,6 @@
 {
-  "apk": null,
+  "apks": [],
+  "activeApkId": "",
   "videos": [],
   "nextIndex": 0
 }
