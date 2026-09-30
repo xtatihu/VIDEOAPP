@@ -237,12 +237,6 @@
     el.textContent = raw ? ("Last saved: " + new Date(Number(raw)).toLocaleString()) : "Last saved: never";
   }
 
-  function esc(value) {
-    return String(value).replace(/[&<>"']/g, function (ch) {
-      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch];
-    });
-  }
-
   function paintLibrary(lib) {
     var apk = lib && lib.apk;
     var cur = document.getElementById("curApk");
@@ -258,12 +252,28 @@
     var list = document.getElementById("videoList");
     var empty = document.getElementById("videoEmpty");
     empty.hidden = videos.length > 0;
-    list.innerHTML = videos.map(function (item, index) {
-      var label = item.type === "file" ? "Uploaded file" : "Link";
-      return '<div class="prow"><div class="meta"><div class="name">' + (index + 1) + ". " + esc(item.name || item.url) + '</div><div class="kind">' + label + "</div></div><button class="btn mini" type="button" data-remove=\"" + esc(item.id) + "\">Remove</button></div>";
-    }).join("");
-    list.querySelectorAll("[data-remove]").forEach(function (btn) {
-      btn.onclick = function () { removeVideo(btn.getAttribute("data-remove")); };
+    list.innerHTML = "";
+    videos.forEach(function (item, index) {
+      var row = document.createElement("div");
+      row.className = "prow";
+      var meta = document.createElement("div");
+      meta.className = "meta";
+      var name = document.createElement("div");
+      name.className = "name";
+      name.textContent = (index + 1) + ". " + (item.name || item.url);
+      var kind = document.createElement("div");
+      kind.className = "kind";
+      kind.textContent = item.type === "file" ? "Uploaded file" : "Link";
+      var button = document.createElement("button");
+      button.className = "btn mini";
+      button.type = "button";
+      button.textContent = "Remove";
+      button.onclick = function () { removeVideo(item.id); };
+      meta.appendChild(name);
+      meta.appendChild(kind);
+      row.appendChild(meta);
+      row.appendChild(button);
+      list.appendChild(row);
     });
 
     if (videos.length) {
