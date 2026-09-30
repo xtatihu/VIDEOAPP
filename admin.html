@@ -38,6 +38,9 @@
     background:linear-gradient(135deg,#ff1744,#ff006e)}
   .btn:active{transform:scale(.98)}
   .btn.ghost{background:rgba(255,255,255,.08);font-weight:600}
+  .btn.danger{background:transparent;color:#ffb4c0;border:1px solid rgba(255,90,110,.75)}
+  .btn:disabled{opacity:.45;cursor:not-allowed}
+  .danger-block{border-color:rgba(255,80,100,.5);background:rgba(90,0,20,.35)}
   .err{color:#ff8fa3;font-size:13px;min-height:18px;margin-bottom:8px}
   .ok{color:#4ade80;font-size:13px;min-height:18px;margin:4px 0 10px}
   .current{font-size:12px;color:#f3d5dc;word-break:break-all;
@@ -128,6 +131,12 @@
           <input type="file" id="apkFile" accept=".apk,application/vnd.android.package-archive">
           <button class="btn" id="uploadApk">Upload APK</button>
         </div>
+      </div>
+      <div class="block danger-block">
+        <h3 class="block-title">DELETE APK</h3>
+        <p class="hint">This only removes the APK. Videos, page text, and the download count stay as they are.</p>
+        <div class="current" id="apkDeleteName">No APK saved</div>
+        <button class="btn danger" id="deleteApk" type="button" disabled>Delete APK</button>
       </div>
       <div class="block">
         <h3 class="block-title">DOWNLOAD COUNT</h3>
@@ -280,12 +289,21 @@
   function paintLibrary(lib) {
     var apk = lib && lib.apk;
     var cur = document.getElementById("curApk");
+    var delName = document.getElementById("apkDeleteName");
+    var delBtn = document.getElementById("deleteApk");
     if (!apk || !apk.url) {
       cur.textContent = "Not set — the button uses /download";
+      delName.textContent = "No APK saved";
+      delBtn.disabled = true;
     } else if (apk.type === "file") {
-      cur.textContent = "Uploaded file: " + (apk.name || apk.url);
+      var fileName = apk.name || "app.apk";
+      cur.textContent = "Customers download this file as " + fileName;
+      delName.textContent = fileName;
+      delBtn.disabled = false;
     } else {
       cur.textContent = "Link: " + apk.url;
+      delName.textContent = apk.url;
+      delBtn.disabled = false;
     }
 
     var videos = (lib && lib.videos) || [];
@@ -381,9 +399,22 @@
         document.getElementById("apkFile").value = "";
         paintLibrary(res.body);
         stamp();
-        say("APK uploaded. The download button uses this file.", true);
+        say("APK uploaded. Customers download it as " + ((res.body.apk && res.body.apk.name) || "the same file name") + ".", true);
       })
       .catch(function () { say("Upload failed.", false); });
+  };
+
+  document.getElementById("deleteApk").onclick = function () {
+    if (document.getElementById("deleteApk").disabled) return;
+    fetch("/api/library/apk", { method: "DELETE" })
+      .then(function (r) { return r.json(); })
+      .then(function (lib) {
+        del("apk_url");
+        paintLibrary(lib);
+        stamp();
+        say("APK deleted. The download button uses /download again.", true);
+      })
+      .catch(function () { say("Could not delete the APK.", false); });
   };
 
   document.getElementById("saveVid").onclick = function () {

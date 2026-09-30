@@ -305,11 +305,18 @@
     fetch("/api/library", { cache: "no-store" })
       .then(function (r) { return r.json(); })
       .then(function (data) {
-        var href = data && data.apk && data.apk.url;
-        if (!href) href = read("apk_url") || DEFAULT_APK;
+        var apk = data && data.apk;
+        if (apk && apk.type === "file") {
+          download.setAttribute("href", "/api/apk-file");
+          download.setAttribute("download", apk.name || "app.apk");
+          return;
+        }
+        download.removeAttribute("download");
+        var href = (apk && apk.url) || read("apk_url") || DEFAULT_APK;
         if (download.getAttribute("href") !== href) download.setAttribute("href", href);
       })
       .catch(function () {
+        download.removeAttribute("download");
         var href = read("apk_url") || DEFAULT_APK;
         if (download.getAttribute("href") !== href) download.setAttribute("href", href);
       });

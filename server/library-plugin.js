@@ -86,13 +86,46 @@ export function libraryApi(root) {
     return crypto.randomBytes(6).toString("hex");
   }
 
+  function downloadName(name) {
+    const base = path.basename(String(name || "app.apk")).replace(/[\r\n"]/g, "").trim();
+    const clean = base || "app.apk";
+    return clean.toLowerCase().endsWith(".apk") ? clean : clean + ".apk";
+  }
+
+  function sendApkFile(res) {
+    const apk = readLib().apk;
+    if (!apk || apk.type !== "file" || !apk.url) {
+      res.statusCode = 404;
+      res.end("No APK uploaded");
+      return;
+    }
+    const full = path.join(uploadDir, path.basename(apk.url));
+    if (!fs.existsSync(full)) {
+      res.statusCode = 404;
+      res.end("APK file missing");
+      return;
+    }
+    const name = downloadName(apk.name);
+    const ascii = name.replace(/[^\x20-\x7E]/g, "_");
+    res.statusCode = 200;
+    res.setHeader("content-type", "application/vnd.android.package-archive");
+    res.setHeader("content-disposition", 'attachment; filename="' + ascii + "\"; filename*=UTF-8''" + encodeURIComponent(name));
+    res.setHeader("cache-control", "no-store");
+    fs.createReadStream(full).pipe(res);
+  }
+
   return {
     name: "library-api",
     configureServer(server) {
       server.middlewares.use((req, res, next) => {
         const pathOnly = (req.url || "").split("?")[0];
-        if (pathOnly !== "/api/library" && pathOnly !== "/api/play" && pathOnly !== "/api/upload" && pathOnly !== "/api/library/apk" && pathOnly !== "/api/library/videos" && pathOnly !== "/api/library/reset") {
+        if (pathOnly !== "/api/library" && pathOnly !== "/api/play" && pathOnly !== "/api/upload" && pathOnly !== "/api/library/apk" && pathOnly !== "/api/library/videos" && pathOnly !== "/api/library/reset" && pathOnly !== "/api/apk-file") {
           return next();
+        }
+
+        if (req.method === "GET" && pathOnly === "/api/apk-file") {
+          sendApkFile(res);
+          return;
         }
 
         if (req.method === "GET" && pathOnly === "/api/library") {
@@ -137,6 +170,15 @@ export function libraryApi(root) {
               }).then((result) => send(res, 200, result.lib));
             })
             .catch(() => send(res, 400, { error: "Invalid JSON" }));
+          return;
+        }
+
+        if (req.method === "DELETE" && pathOnly === "/api/library/apk") {
+          mutate((current) => {
+            if (current.apk && current.apk.type === "file") removeUpload(current.apk.url);
+            current.apk = null;
+            return { lib: current, extra: current };
+          }).then((result) => send(res, 200, result.lib));
           return;
         }
 
