@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Admin — VideoApp</title>
+<meta name="robots" content="noindex,nofollow">
+<style>
+  *{box-sizing:border-box}
+  body{
+    margin:0;min-height:100vh;font-family:Arial,Helvetica,sans-serif;
+    background:radial-gradient(circle at top,#232327 0%,#101012 45%,#060607 100%);
+    color:#fff;display:flex;justify-content:center;
+  }
+  .wrap{width:100%;max-width:480px;padding:30px 18px 40px}
+  h1{font-size:22px;margin:0 0 4px}
+  .sub{color:#8e8e96;font-size:13px;margin-bottom:22px}
+  .card{border:1px solid rgba(255,255,255,.09);border-radius:18px;
+    background:rgba(255,255,255,.035);padding:20px;margin-bottom:16px}
+  .card h2{font-size:15px;margin:0 0 14px;letter-spacing:1px}
+  label{display:block;font-size:11px;font-weight:700;letter-spacing:1.5px;
+    color:#8e8e96;margin:0 0 8px}
+  input[type=password],input[type=url]{
+    width:100%;padding:13px 14px;border-radius:12px;margin-bottom:12px;
+    border:1px solid rgba(255,255,255,.14);background:#101013;color:#fff;
+    font-size:14px;outline:none}
+  input:focus{border-color:#ff2d55}
+  .btn{display:block;width:100%;padding:14px;border:none;border-radius:12px;cursor:pointer;
+    font-size:15px;font-weight:800;color:#fff;margin-bottom:6px;
+    background:linear-gradient(135deg,#ff1744,#ff006e)}
+  .btn:active{transform:scale(.98)}
+  .btn.ghost{background:rgba(255,255,255,.07);font-weight:600}
+  .err{color:#ff6b81;font-size:13px;min-height:20px;margin-bottom:10px}
+  .ok{color:#4ade80;font-size:13px;min-height:20px;margin:6px 0 10px}
+  .current{font-size:12px;color:#a9a9b2;word-break:break-all;
+    background:#101013;border:1px solid rgba(255,255,255,.08);
+    border-radius:10px;padding:10px 12px;margin-bottom:12px;max-height:74px;overflow:hidden}
+  .row{display:flex;gap:10px}
+  .row .btn{flex:1}
+  .back{display:block;text-align:center;margin-top:6px;color:#8e8e96;
+    font-size:13px;text-decoration:none}
+  .back:hover{color:#fff}
+  [hidden]{display:none!important}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- Password gate -->
+  <div id="gate" class="card">
+    <h1>Admin Login</h1>
+    <div class="sub">Restricted area</div>
+    <label>PASSWORD</label>
+    <input type="password" id="pw" placeholder="Enter admin password" autocomplete="off">
+    <div class="err" id="gateErr"></div>
+    <button class="btn" id="loginBtn">Unlock</button>
+  </div>
+
+  <!-- Settings -->
+  <div id="panel" hidden>
+    <div class="card">
+      <h2>APK DOWNLOAD LINK</h2>
+      <label>CURRENT</label>
+      <div class="current" id="curApk">—</div>
+      <label>NEW LINK</label>
+      <input type="url" id="newApk" placeholder="https://…/app.apk" inputmode="url">
+      <button class="btn" id="saveApk">Save APK Link</button>
+    </div>
+
+    <div class="card">
+      <h2>VIDEO LINK</h2>
+      <label>CURRENT</label>
+      <div class="current" id="curVid">—</div>
+      <label>NEW LINK</label>
+      <input type="url" id="newVid" placeholder="https://…/video.mp4" inputmode="url">
+      <button class="btn" id="saveVid">Save Video Link</button>
+    </div>
+
+    <div class="ok" id="msg"></div>
+    <div class="row">
+      <button class="btn ghost" id="resetBtn">Reset all</button>
+      <button class="btn ghost" id="lockBtn">Lock</button>
+    </div>
+  </div>
+
+  <a class="back" href="index.html">&larr; Back to site</a>
+</div>
+
+<script>
+(function(){
+  var PASS='admin123';
+  var DEFAULT_APK='/download';
+  var gate=document.getElementById('gate'), panel=document.getElementById('panel'),
+      pw=document.getElementById('pw'), gateErr=document.getElementById('gateErr'),
+      msg=document.getElementById('msg');
+
+  function store(k,v){ try{localStorage.setItem(k,v);}catch(e){} }
+  function read(k){ try{return localStorage.getItem(k);}catch(e){return null;} }
+  function del(k){ try{localStorage.removeItem(k);}catch(e){} }
+  function say(t,ok){ msg.style.color=ok?'#4ade80':'#ff6b81'; msg.textContent=t; }
+
+  /* one reusable section: key, current-box, input, save-button, default label */
+  function section(key,curId,inId,btnId,defLabel){
+    var cur=document.getElementById(curId), inp=document.getElementById(inId);
+    function refresh(){ cur.textContent=read(key)||defLabel; }
+    document.getElementById(btnId).onclick=function(){
+      var v=inp.value.trim();
+      if(!v){ say('Paste a link first.',false); return; }
+      store(key,v); inp.value=''; refresh();
+      say('Saved. index.html now uses the new link.',true);
+    };
+    return {refresh:refresh};
+  }
+
+  var apkSec=section('apk_url','curApk','newApk','saveApk',DEFAULT_APK+' (default)');
+  var vidSec=section('video_url','curVid','newVid','saveVid','(page default video)');
+
+  function refreshAll(){ apkSec.refresh(); vidSec.refresh(); }
+
+  function unlock(){
+    if(pw.value===PASS){
+      gate.hidden=true; panel.hidden=false; gateErr.textContent=''; pw.value='';
+      refreshAll(); store('admin_unlocked','1');
+    }else{ gateErr.textContent='Wrong password.'; }
+  }
+  document.getElementById('loginBtn').onclick=unlock;
+  pw.addEventListener('keydown',function(e){ if(e.key==='Enter') unlock(); });
+
+  document.getElementById('resetBtn').onclick=function(){
+    del('apk_url'); del('video_url'); refreshAll();
+    say('Reset. index.html uses its built-in links again.',true);
+  };
+  document.getElementById('lockBtn').onclick=function(){
+    del('admin_unlocked'); panel.hidden=true; gate.hidden=false;
+    msg.textContent='';
+  };
+
+  if(read('admin_unlocked')==='1'){ gate.hidden=true; panel.hidden=false; refreshAll(); }
+})();
+</script>
+</body>
+</html>
