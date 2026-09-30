@@ -168,6 +168,13 @@
           <button class="btn" id="uploadVid">Upload Videos</button>
         </div>
       </div>
+      <div class="block">
+        <h3 class="block-title">PREVIEW TIME</h3>
+        <label>SECONDS ON THE VIDEO SCREEN</label>
+        <input type="number" id="playSeconds" min="1" max="120" step="1" inputmode="numeric" placeholder="7">
+        <p class="hint">Default is 7. While the video is still loading, the screen shows moving colours instead of black. After these seconds the same screen becomes the download button. Tapping the video screen also downloads the APK.</p>
+        <button class="btn" id="saveSeconds" type="button">Save seconds</button>
+      </div>
     </div>
 
     <div class="card" data-panel="words" hidden>
@@ -185,9 +192,10 @@
       <div class="block" data-words-panel="logo">
         <h3 class="block-title">LOGO</h3>
         <label>FIRST WORD</label>
-        <input type="text" id="logoName" placeholder="Video">
+        <input type="text" id="logoName" placeholder="Desi">
         <label>SECOND WORD</label>
-        <input type="text" id="logoAccent" placeholder="App">
+        <input type="text" id="logoAccent" placeholder="Tales">
+        <p class="hint">Odd words are gold and even words are silver. Desi stays gold, Tales stays silver. The 18+ badge sits beside the name.</p>
         <button class="btn" type="button" data-save="logoName,logoAccent">Save logo</button>
       </div>
 
@@ -264,8 +272,8 @@
   var DEFAULT_APK = "/download";
   var TEXT_IDS = ["logoName", "logoAccent", "subtitle", "hotLabel", "watchLine", "dlMain", "dlSmall", "infoTitle", "infoText", "footText"];
   var PAGE_WORDS = {
-    logoName: "Video",
-    logoAccent: "App",
+    logoName: "Desi",
+    logoAccent: "Tales",
     subtitle: "🔞 Watch the preview & download the app 🔞",
     hotLabel: "HOT 🔥",
     watchLine: "Download APK to watch FULL video",
@@ -565,12 +573,23 @@
     uploadVideoFiles(document.getElementById("videoFile").files);
   };
 
+  document.getElementById("saveSeconds").onclick = function () {
+    var n = parseInt(document.getElementById("playSeconds").value, 10);
+    if (!isFinite(n) || n < 1 || n > 120) { say("Enter seconds from 1 to 120.", false); return; }
+    if (n === 7) del("playSeconds");
+    else store("playSeconds", String(n));
+    stamp();
+    say("Saved. The video screen becomes the download button after " + n + " seconds.", true);
+  };
+
   function fillText() {
     TEXT_IDS.forEach(function (id) {
       var el = document.getElementById(id);
       el.value = read(id) || PAGE_WORDS[id] || "";
     });
     document.getElementById("show18").checked = read("show_18") !== "0";
+    var seconds = parseInt(read("playSeconds"), 10);
+    document.getElementById("playSeconds").value = isFinite(seconds) && seconds >= 1 ? String(seconds) : "7";
     fetch("/api/downloads", { cache: "no-store" })
       .then(function (r) { return r.json(); })
       .then(function (data) {
@@ -680,6 +699,7 @@
     del("apk_url");
     del("video_url");
     TEXT_IDS.forEach(del);
+    del("playSeconds");
     del("show_18");
     del("admin_saved_at");
     Promise.all([

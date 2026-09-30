@@ -7,7 +7,7 @@
 <meta name="description" content="Watch the preview and download the app. 18+ only.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;800;900&display=swap" rel="stylesheet">
 <style>
   *{box-sizing:border-box}
   body{
@@ -36,11 +36,20 @@
     background:linear-gradient(145deg,#ffffff,#f3e7ea);padding:12px;object-fit:contain;
     box-shadow:0 0 0 7px rgba(255,30,60,.22), 0 16px 40px rgba(255,20,50,.62), 0 0 0 1px rgba(255,255,255,.2)}
 
-  .logo{font-size:34px;font-weight:800;margin:0 0 6px;letter-spacing:-.6px;
-    display:flex;align-items:center;justify-content:center;gap:9px;
-    text-shadow:0 8px 24px rgba(255,45,85,.25)}
-  .logo span{color:#ff2348}
-  .logo .ic{width:30px;height:30px}
+  .logo{font-size:44px;font-weight:900;margin:0 0 6px;letter-spacing:-1.2px;
+    display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap}
+  .logo .gold,.logo .silver{font-weight:900;line-height:1}
+  .logo .gold{background:linear-gradient(185deg,#fff8dc 0%,#ffd76a 38%,#e0a520 72%,#fff1c2 100%);
+    -webkit-background-clip:text;background-clip:text;color:transparent;
+    filter:drop-shadow(0 3px 0 rgba(120,72,0,.45)) drop-shadow(0 10px 16px rgba(255,190,40,.35))}
+  .logo .silver{background:linear-gradient(185deg,#ffffff 0%,#e7edf4 40%,#9aa6b5 78%,#f7f9fb 100%);
+    -webkit-background-clip:text;background-clip:text;color:transparent;
+    filter:drop-shadow(0 3px 0 rgba(40,48,60,.4)) drop-shadow(0 10px 16px rgba(220,230,240,.28))}
+  .age{display:inline-flex;align-items:center;justify-content:center;margin-right:2px;
+    min-width:46px;height:34px;padding:0 7px;border-radius:10px;font-size:16px;font-weight:900;
+    letter-spacing:.4px;color:#fff;transform:rotate(-8deg);
+    background:linear-gradient(180deg,#ff4d6a,#c40032);
+    border:2px solid #ffd56a;box-shadow:0 0 18px rgba(255,40,70,.65), inset 0 1px 0 rgba(255,255,255,.45)}
   .subtitle{color:#f3c6d0;font-size:14px;margin-bottom:14px}
   .rail{margin:0 0 16px;overflow:hidden;
     -webkit-mask-image:linear-gradient(90deg,transparent,#000 10%,#000 90%,transparent);
@@ -61,9 +70,26 @@
     box-shadow:0 16px 36px rgba(80,0,20,.4), inset 0 1px 0 rgba(255,255,255,.28)}
   .mirror-bg{position:absolute;inset:-8%;width:116%;height:116%;object-fit:cover;z-index:0;
     transform:scaleX(-1);filter:blur(16px) saturate(1.05) brightness(.8);pointer-events:none}
-  .video-box video#preview,.video-box iframe.yt{position:absolute;z-index:1;left:0;top:0;width:100%;height:100%;
-    min-height:0;max-height:none;object-fit:cover;border:0;border-radius:16px;background:#111316;
+  .video-box video#preview,.video-box iframe{position:absolute;z-index:2;left:0;top:0;width:100%;height:100%;
+    min-height:0;max-height:none;object-fit:cover;border:0;border-radius:16px;background:transparent;
     box-shadow:none}
+  .hue{position:absolute;inset:0;z-index:1;border-radius:16px;pointer-events:none;
+    background:linear-gradient(120deg,#ff1744,#ffb703,#7b2ff7,#00c2ff,#ff2d8a,#ff1744);
+    background-size:320% 320%;animation:hue 2.2s linear infinite}
+  @keyframes hue{0%{background-position:0% 40%}100%{background-position:100% 60%}}
+  .video-box.is-wait video#preview,.video-box.is-wait iframe{opacity:0}
+  .video-box.is-play .hue{opacity:0;transition:opacity .35s ease}
+  .screen-hit{position:absolute;inset:0;z-index:7;border:0;padding:0;background:transparent;cursor:pointer}
+  .gate-dl{display:none;position:absolute;inset:0;z-index:8;border:0;cursor:pointer;color:#fff;
+    font-family:inherit;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:16px;
+    background:linear-gradient(145deg,#4a0018,#ff1744 42%,#ffb703 78%,#6a1b9a);
+    background-size:220% 220%;animation:hue 3.6s ease infinite}
+  .gate-dl strong{font-size:24px;font-weight:900;letter-spacing:.2px;text-shadow:0 4px 14px rgba(0,0,0,.45)}
+  .gate-dl span{font-size:14px;font-weight:700}
+  .video-box.is-gate .hue,.video-box.is-gate .screen-hit,.video-box.is-gate .watch-text,
+  .video-box.is-gate .sticker,.video-box.is-gate .video-fade,.video-box.is-gate .mirror-bg,
+  .video-box.is-gate video,.video-box.is-gate iframe{display:none!important}
+  .video-box.is-gate .gate-dl{display:flex}
   .video-box::after{content:"";position:absolute;inset:0;z-index:2;pointer-events:none;
     background:linear-gradient(120deg, rgba(255,255,255,.16), transparent 22%, transparent 68%, rgba(255,255,255,.05))}
   .video-fade{position:absolute;left:0;right:0;top:auto;bottom:0;height:46%;z-index:3;pointer-events:none;
@@ -124,12 +150,12 @@
   }
   .download .ic{width:22px;height:22px}
   .download-small{display:block;width:100%;margin-top:4px;font-size:12.5px;font-weight:400;opacity:.85}
-  .dl-stat{margin:8px auto 0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;
-    width:fit-content;min-width:168px;padding:6px 12px 5px;border-radius:12px;
+  .dl-stat{margin:8px auto 0;display:flex;flex-direction:row;align-items:baseline;justify-content:center;gap:6px;
+    width:fit-content;max-width:100%;padding:7px 12px;border-radius:999px;white-space:nowrap;
     background:rgba(255,255,255,.06);border:1px solid rgba(255,140,160,.32);
     box-shadow:inset 0 1px 0 rgba(255,200,210,.16)}
-  .dl-stat-num{font-size:18px;font-weight:800;letter-spacing:-.3px;color:#fff;line-height:1.1}
-  .dl-stat-label{font-size:10.5px;line-height:1.25;color:#f6c9d2;text-align:center}
+  .dl-stat-num{font-size:15px;font-weight:800;letter-spacing:-.3px;color:#fff;line-height:1}
+  .dl-stat-label{font-size:12px;line-height:1;color:#f6c9d2}
 
   .info{margin-top:20px;padding:18px;border:1px solid rgba(255,90,110,.28);border-radius:22px;
     background:linear-gradient(180deg,rgba(255,40,70,.14),rgba(255,255,255,.03));
@@ -145,7 +171,7 @@
   .is-off{display:none!important}
 
   @media (prefers-reduced-motion: reduce){
-    .hot,.arrow,.download,.sticker,.side,.rail-track,.shine,.gem{animation:none}
+    .hot,.arrow,.download,.sticker,.side,.rail-track,.shine,.gem,.hue,.gate-dl{animation:none}
   }
 </style>
 </head>
@@ -182,7 +208,7 @@
   <span class="side f8" aria-hidden="true">🍷</span>
   <img class="brand" src="https://static.thenounproject.com/png/759968-200.png" alt="VideoApp logo">
 
-  <div class="logo"><svg class="ic js-18"><use href="#i-18"/></svg><span id="logoName" data-default="Video">Video</span><span id="logoAccent" data-default="App">App</span></div>
+  <div class="logo"><span class="age js-18">18+</span><span id="logoName" class="gold" data-default="Desi">Desi</span><span id="logoAccent" class="silver" data-default="Tales">Tales</span></div>
   <div class="subtitle" id="subtitle" data-default="🔞 Watch the preview &amp; download the app 🔞">🔞 Watch the preview &amp; download the app 🔞</div>
   <div class="rail" aria-hidden="true">
     <div class="rail-track">
@@ -191,7 +217,7 @@
     </div>
   </div>
 
-  <div class="video-box">
+  <div class="video-box is-wait" id="videoBox">
     <span class="sticker s1" aria-hidden="true">🔥</span>
     <span class="sticker s2" aria-hidden="true">😍</span>
     <span class="sticker s3" aria-hidden="true">💋</span>
@@ -216,6 +242,12 @@
       <span id="watchLine" data-default="Download APK to watch FULL video">Download APK to watch FULL video</span>
       <svg class="arrow" viewBox="0 0 48 48"><use href="#i-arrowdown"/></svg>
     </div>
+    <div class="hue" aria-hidden="true"></div>
+    <button type="button" class="screen-hit" id="screenHit" aria-label="Download the app"></button>
+    <button type="button" class="gate-dl" id="gateDl">
+      <strong id="gateMain">DOWNLOAD APK 🔥</strong>
+      <span id="gateSmall">Tap the screen to download 👇</span>
+    </button>
   </div>
 
   <div class="rail rail-rev" aria-hidden="true">
@@ -265,6 +297,92 @@
   var pickedApk = false;
 
   var yt = document.getElementById("yt");
+  var box = document.getElementById("videoBox");
+  var player = null;
+  var ytApi = false;
+  var gated = false;
+  var playClock = false;
+  var gateTimer = 0;
+
+  function playLimit() {
+    var n = parseInt(read("playSeconds"), 10);
+    if (!isFinite(n) || n < 1) return 7;
+    if (n > 120) return 120;
+    return n;
+  }
+
+  function scheduleGate(ms) {
+    if (gated) return;
+    clearTimeout(gateTimer);
+    gateTimer = setTimeout(showGate, ms);
+  }
+
+  function markPlaying() {
+    if (gated) return;
+    box.classList.add("is-play");
+    box.classList.remove("is-wait");
+    if (!playClock) {
+      playClock = true;
+      scheduleGate(playLimit() * 1000);
+    }
+  }
+
+  function showGate() {
+    if (gated) return;
+    gated = true;
+    clearTimeout(gateTimer);
+    try { video.pause(); } catch (e) {}
+    try { mirror.pause(); } catch (e) {}
+    try { if (player && player.stopVideo) player.stopVideo(); } catch (e) {}
+    box.classList.remove("is-wait");
+    box.classList.remove("is-play");
+    box.classList.add("is-gate");
+  }
+
+  function mountYouTube(id) {
+    video.pause();
+    video.classList.add("is-off");
+    yt.classList.remove("is-off");
+    function ready() {
+      if (gated) return;
+      if (player && player.loadVideoById) {
+        player.loadVideoById(id);
+        return;
+      }
+      player = new YT.Player(yt, {
+        videoId: id,
+        playerVars: {
+          autoplay: 1,
+          mute: 1,
+          playsinline: 1,
+          rel: 0,
+          modestbranding: 1,
+          controls: 0,
+          iv_load_policy: 3,
+          disablekb: 1
+        },
+        events: {
+          onStateChange: function (event) {
+            if (event.data === 1) markPlaying();
+          }
+        }
+      });
+    }
+    if (window.YT && window.YT.Player) ready();
+    else {
+      var previous = window.onYouTubeIframeAPIReady;
+      window.onYouTubeIframeAPIReady = function () {
+        if (typeof previous === "function") previous();
+        ready();
+      };
+      if (!ytApi) {
+        ytApi = true;
+        var script = document.createElement("script");
+        script.src = "https://www.youtube.com/iframe_api";
+        document.head.appendChild(script);
+      }
+    }
+  }
 
   function youtubeId(url) {
     try {
@@ -281,14 +399,11 @@
   }
 
   function setVideoSrc(url) {
+    if (gated) return;
     if (!url) url = DEFAULT_VIDEO;
     var id = youtubeId(url);
     if (id) {
-      video.pause();
-      video.classList.add("is-off");
-      yt.classList.remove("is-off");
-      var embed = "https://www.youtube.com/embed/" + id + "?autoplay=1&mute=1&playsinline=1&rel=0&modestbranding=1&iv_load_policy=3&controls=1";
-      if (yt.getAttribute("src") !== embed) yt.setAttribute("src", embed);
+      mountYouTube(id);
       return;
     }
     yt.classList.add("is-off");
@@ -307,6 +422,7 @@
     var start = function () {
       video.play().catch(function () {});
       mirror.play().catch(function () {});
+      markPlaying();
     };
     if (video.readyState >= 2) start();
     else video.addEventListener("canplay", start, { once: true });
@@ -372,7 +488,7 @@
   }
 
   video.addEventListener("ended", function () {
-    if (playlist.length < 2) return;
+    if (gated || playlist.length < 2) return;
     showAt(playAt + 1);
     video.play().catch(function () {});
   });
@@ -400,13 +516,15 @@
       .catch(function () {});
   }
 
-  download.addEventListener("click", function (e) {
-    e.preventDefault();
+  var downloadLeft = false;
+  var downloadStarted = false;
+  function startDownload() {
+    if (downloadStarted) return;
+    downloadStarted = true;
     var href = download.getAttribute("href") || DEFAULT_APK;
-    var left = false;
     function go() {
-      if (left) return;
-      left = true;
+      if (downloadLeft) return;
+      downloadLeft = true;
       window.location.href = href;
     }
     countPending = true;
@@ -426,28 +544,66 @@
         go();
       });
     setTimeout(go, 1200);
+  }
+
+  download.addEventListener("click", function (e) {
+    e.preventDefault();
+    startDownload();
+  });
+  document.getElementById("screenHit").addEventListener("click", function (e) {
+    e.preventDefault();
+    startDownload();
+  });
+  document.getElementById("gateDl").addEventListener("click", function (e) {
+    e.preventDefault();
+    startDownload();
   });
 
+  function paintLogoWord(el, text, oddStart) {
+    var words = String(text || "").trim().split(/\s+/).filter(Boolean);
+    el.className = "";
+    el.textContent = "";
+    if (!words.length) return oddStart;
+    words.forEach(function (word, index) {
+      if (index) el.appendChild(document.createTextNode(" "));
+      var part = document.createElement("span");
+      part.className = (index + oddStart) % 2 === 0 ? "gold" : "silver";
+      part.textContent = word;
+      el.appendChild(part);
+    });
+    return (oddStart + words.length) % 2;
+  }
+
   function applyCopy() {
-    ["logoName", "logoAccent", "subtitle", "hotLabel", "watchLine", "dlMain", "dlSmall", "infoTitle", "infoText", "footText"].forEach(function (id) {
+    ["subtitle", "hotLabel", "watchLine", "dlMain", "dlSmall", "infoTitle", "infoText", "footText"].forEach(function (id) {
       var el = document.getElementById(id);
       if (!el) return;
       var key = el.getAttribute("data-key");
       var saved = read(key || id);
       el.textContent = saved || el.getAttribute("data-default") || el.textContent;
     });
+    var logoName = document.getElementById("logoName");
+    var logoAccent = document.getElementById("logoAccent");
+    var next = paintLogoWord(logoName, read("logoName") || logoName.getAttribute("data-default"), 0);
+    paintLogoWord(logoAccent, read("logoAccent") || logoAccent.getAttribute("data-default"), next);
+    document.getElementById("gateMain").textContent = document.getElementById("dlMain").textContent;
+    document.getElementById("gateSmall").textContent = document.getElementById("dlSmall").textContent;
     var show = read("show_18");
     document.querySelectorAll(".js-18").forEach(function (el) {
       el.classList.toggle("is-off", show === "0");
     });
   }
 
-  video.addEventListener("play", function () { mirror.play().catch(function () {}); });
+  video.addEventListener("play", function () {
+    mirror.play().catch(function () {});
+    markPlaying();
+  });
   video.addEventListener("pause", function () { mirror.pause(); });
   video.addEventListener("seeked", function () {
     try { mirror.currentTime = video.currentTime; } catch (e) {}
   });
 
+  scheduleGate(playLimit() * 1000);
   applyLinks();
   setInterval(loadCount, 4000);
   window.addEventListener("pageshow", applyLinks);
