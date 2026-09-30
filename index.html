@@ -101,8 +101,21 @@
 
   .layout {
     display: grid;
-    gap: 28px;
-    align-items: center;
+    gap: 22px;
+  }
+  .stage { min-width: 0; display: flex; flex-direction: column; }
+  .screen {
+    position: relative;
+    overflow: hidden;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    border-radius: 28px;
+    background: #050505;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow:
+      0 30px 80px -30px rgba(0, 0, 0, 0.8),
+      0 0 0 1px rgba(255, 255, 255, 0.03);
   }
 
   .eyebrow {
@@ -137,7 +150,7 @@
     display: grid;
     grid-template-columns: repeat(3, 1fr);
     gap: 1px;
-    margin: 26px 0 0;
+    margin: 0;
     padding: 0;
     list-style: none;
     overflow: hidden;
@@ -152,7 +165,7 @@
   .facts strong {
     display: block;
     font-size: 15px;
-    font-weight: 750;
+    font-weight: 700;
     letter-spacing: -0.02em;
   }
   .facts span {
@@ -213,23 +226,16 @@
     font-size: 13px;
   }
 
-  .stage { min-width: 0; }
-  .screen {
-    position: relative;
-    overflow: hidden;
-    border-radius: 28px;
-    background: #050505;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    box-shadow:
-      0 30px 80px -30px rgba(0, 0, 0, 0.8),
-      0 0 0 1px rgba(255, 255, 255, 0.03);
-  }
   video {
     display: block;
     width: 100%;
+    flex: 1;
+    min-height: 460px;
     max-height: min(70vh, 680px);
+    object-fit: cover;
     background: #050505;
   }
+  .is-hidden { display: none !important; }
   .fallback {
     min-height: 460px;
     display: grid;
@@ -336,18 +342,30 @@
   .dock.is-on { display: flex; }
 
   @media (min-width: 900px) {
-    .shell { padding: 36px 0 48px; }
+    body { min-height: 100vh; display: flex; }
+    .shell {
+      margin: auto;
+      padding: 36px 0;
+      width: min(1080px, calc(100% - 72px));
+    }
     .layout {
       grid-template-columns: minmax(0, 1.05fr) minmax(320px, 0.9fr);
-      gap: 56px;
+      grid-template-areas:
+        "intro stage"
+        "action stage";
+      gap: 28px 56px;
+      align-items: stretch;
     }
+    .intro { grid-area: intro; align-self: end; }
+    .action { grid-area: action; align-self: start; }
+    .stage { grid-area: stage; }
     .facts li { padding: 16px 16px; }
     .dock { display: none !important; }
   }
 
   @media (max-width: 640px) {
     .facts strong { font-size: 13px; }
-    .fallback { min-height: 380px; }
+    .fallback, video { min-height: 250px; }
     h1 { font-size: 3.15rem; }
   }
 
@@ -377,11 +395,32 @@
   </header>
 
   <div class="layout">
-    <section>
+    <section class="intro">
       <p class="eyebrow">Direct APK</p>
       <h1 id="preview-title">Watch the preview.<br><em>Get the full video.</em></h1>
       <p class="lead">Watch the preview and download the app. The full collection unlocks after install — no ads.</p>
+    </section>
 
+    <section class="stage" aria-label="Video preview">
+      <div class="screen">
+        <span class="chip">Preview</span>
+        <video id="preview" class="is-hidden" controls autoplay muted loop playsinline preload="metadata">
+          <source src="https://github-production-user-asset-6210df.s3.amazonaws.com/326748109/657620961-51f4f6cc-5d64-43b2-ac05-f447da6854dd.mp4?X-Amz-Algorithm=AWS4-HMAC-SHA256&amp;X-Amz-Credential=AKIAVCODYLSA53PQK4ZA%2F20260929%2Fus-east-1%2Fs3%2Faws4_request&amp;X-Amz-Date=20260929T093117Z&amp;X-Amz-Expires=300&amp;X-Amz-Signature=ce9c138f532742e478ba6b311f06bd471c0a8ec4bcbb8eec4ec43003fcff6a53&amp;X-Amz-SignedHeaders=host&amp;response-content-type=video%2Fmp4" type="video/mp4">
+        </video>
+        <div class="fallback" id="fallback">
+          <div>
+            <div class="play" aria-hidden="true">
+              <svg viewBox="0 0 48 48"><path fill="#fff" d="M16 12v24l22-12z"/></svg>
+            </div>
+            <p>Full video</p>
+            <span id="fallback-note">The full video plays in the app.</span>
+          </div>
+        </div>
+      </div>
+      <p class="under"><b>Download the APK</b> to watch the full video.</p>
+    </section>
+
+    <section class="action">
       <ul class="facts">
         <li><strong>40,000+</strong><span>Hot videos</span></li>
         <li><strong>No ads</strong><span>Inside the app</span></li>
@@ -401,25 +440,6 @@
         </span>
       </a>
       <p class="note">Android install · 18+ only</p>
-    </section>
-
-    <section class="stage" aria-label="Video preview">
-      <div class="screen">
-        <span class="chip">Preview</span>
-        <video id="preview" controls autoplay muted loop playsinline preload="metadata">
-          <source src="https://github-production-user-asset-6210df.s3.amazonaws.com/326748109/657620961-51f4f6cc-5d64-43b2-ac05-f447da6854dd.mp4?X-Amz-Algorithm=AWS4-HMAC-SHA256&amp;X-Amz-Credential=AKIAVCODYLSA53PQK4ZA%2F20260929%2Fus-east-1%2Fs3%2Faws4_request&amp;X-Amz-Date=20260929T093117Z&amp;X-Amz-Expires=300&amp;X-Amz-Signature=ce9c138f532742e478ba6b311f06bd471c0a8ec4bcbb8eec4ec43003fcff6a53&amp;X-Amz-SignedHeaders=host&amp;response-content-type=video%2Fmp4" type="video/mp4">
-        </video>
-        <div class="fallback" id="fallback" hidden>
-          <div>
-            <div class="play" aria-hidden="true">
-              <svg viewBox="0 0 48 48"><path fill="#fff" d="M16 12v24l22-12z"/></svg>
-            </div>
-            <p>Full video</p>
-            <span>Preview didn’t load. It’s in the APK.</span>
-          </div>
-        </div>
-      </div>
-      <p class="under"><b>Download the APK</b> to watch the full video.</p>
     </section>
   </div>
 
@@ -444,10 +464,18 @@
 <script>
   const video = document.querySelector("#preview");
   const fallback = document.querySelector("#fallback");
-  const showFallback = () => {
-    fallback.hidden = false;
-    video.hidden = true;
+  const note = document.querySelector("#fallback-note");
+  const showVideo = () => {
+    if (video.error || video.readyState < 2) return;
+    fallback.classList.add("is-hidden");
+    video.classList.remove("is-hidden");
   };
+  const showFallback = () => {
+    video.classList.add("is-hidden");
+    fallback.classList.remove("is-hidden");
+    note.textContent = "This clip didn’t load. The full video is in the APK.";
+  };
+  video.addEventListener("canplay", showVideo);
   video.addEventListener("error", showFallback);
   const source = video.querySelector("source");
   if (source) source.addEventListener("error", showFallback);
