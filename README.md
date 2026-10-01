@@ -28,5 +28,5 @@ History scrolls, and each row can be deleted. Visits, history, the account, the 
 ## Your files
 
 - The download button goes to `/download`. Point that path at your APK on the server that hosts this page.
-- The preview video is the one saved in Admin → Videos. A YouTube link or an uploaded mp4 starts as soon as the page opens.
+- The preview video is the one saved in Admin → Videos. A YouTube link starts in the player. An uploaded mp4 is prepared so the landing page shows its thumbnail at once and the video starts without waiting for the whole file.
 - Videos → Download screen can be turned on or off. When it is on, that card covers the video after the chosen seconds and its own label, title, and line. When it is off, the video keeps playing. The download button under the video stays.

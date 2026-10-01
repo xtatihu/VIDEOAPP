@@ -97,8 +97,13 @@
   .gate-dl strong{font-size:22px;font-weight:900;letter-spacing:.2px;line-height:1.15;text-align:center;
     text-shadow:0 4px 14px rgba(0,0,0,.45)}
   .gate-dl .gate-line{font-size:13px;font-weight:700;text-align:center;color:#ffe4ea}
+  .poster-bg{position:absolute;inset:-8%;width:116%;height:116%;object-fit:cover;z-index:0;
+    transform:scale(1.08);filter:blur(18px) saturate(1.05) brightness(.75);pointer-events:none}
+  .poster{position:absolute;inset:0;z-index:3;width:100%;height:100%;object-fit:cover;border-radius:16px;pointer-events:none}
+  .video-box.is-showing .poster{opacity:0;transition:opacity .2s ease}
   .video-box.is-gate .hue,.video-box.is-gate .screen-hit,.video-box.is-gate .watch-text,
   .video-box.is-gate .sticker,.video-box.is-gate .video-fade,.video-box.is-gate .mirror-bg,
+  .video-box.is-gate .poster,.video-box.is-gate .poster-bg,
   .video-box.is-gate video,.video-box.is-gate iframe{display:none!important}
   .video-box.is-gate .gate-dl{display:flex}
   .video-box::after{content:"";position:absolute;inset:0;z-index:2;pointer-events:none;
@@ -240,9 +245,11 @@
     <span class="sticker s8" aria-hidden="true">🥵</span>
     <span class="sticker s9" aria-hidden="true">😈</span>
     <span class="sticker s10" aria-hidden="true">🌶️</span>
+    <img id="posterBg" class="poster-bg" alt="" hidden>
     <video id="mirror" class="mirror-bg" muted autoplay loop playsinline preload="none" aria-hidden="true"></video>
     <iframe class="yt is-off" id="yt" title="Video" referrerpolicy="strict-origin-when-cross-origin" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe>
     <video id="preview" autoplay muted loop playsinline preload="auto"></video>
+    <img id="poster" class="poster" alt="" hidden>
     <div class="video-fade"></div>
     <div class="watch-text">
       <span class="hot" id="hotLabel" data-default="HOT 🔥">HOT 🔥</span><br>
@@ -418,6 +425,7 @@
     try { yt.removeAttribute("src"); } catch (e) {}
     box.classList.remove("is-wait");
     box.classList.remove("is-play");
+    box.classList.remove("is-showing");
     box.classList.add("is-gate");
     trackGate();
   }
@@ -473,10 +481,37 @@
     return "";
   }
 
+  function filePoster(url) {
+    if (!url || String(url).indexOf("/uploads/") !== 0) return "";
+    return String(url).replace(/\.[^.]+$/, ".jpg");
+  }
+
+  function paintThumb(url) {
+    var poster = document.getElementById("poster");
+    var bg = document.getElementById("posterBg");
+    var src = filePoster(url);
+    if (!poster || !bg) return;
+    if (!src) {
+      poster.hidden = true;
+      bg.hidden = true;
+      poster.removeAttribute("src");
+      bg.removeAttribute("src");
+      video.removeAttribute("poster");
+      return;
+    }
+    poster.hidden = false;
+    bg.hidden = false;
+    if (poster.getAttribute("src") !== src) poster.src = src;
+    if (bg.getAttribute("src") !== src) bg.src = src;
+    video.poster = src;
+    box.classList.remove("is-wait");
+  }
+
   function setVideoSrc(url) {
     if (gated) return;
     var id = youtubeId(url);
     if (id) {
+      paintThumb("");
       mountYouTube(id);
       return;
     }
@@ -486,17 +521,16 @@
     video.muted = true;
     video.autoplay = true;
     video.playsInline = true;
+    try { mirror.pause(); mirror.removeAttribute("src"); } catch (e) {}
     if (!url) return;
-    if (video.getAttribute("src") !== url) video.src = url;
-    var start = function () {
-      var pending = video.play();
-      if (pending && pending.catch) pending.catch(function () {});
-      if (mirror.getAttribute("src") !== url) mirror.src = url;
-      mirror.play().catch(function () {});
-      markPlaying();
-    };
-    start();
-    if (video.readyState < 2) video.addEventListener("loadeddata", start, { once: true });
+    box.classList.remove("is-showing");
+    paintThumb(url);
+    if (video.getAttribute("src") !== url) {
+      video.preload = "auto";
+      video.src = url;
+    }
+    var pending = video.play();
+    if (pending && pending.catch) pending.catch(function () {});
   }
 
   function showAt(i) {
@@ -692,9 +726,16 @@
   }
 
   video.addEventListener("play", function () {
-    mirror.play().catch(function () {});
+    if (mirror.getAttribute("src")) mirror.play().catch(function () {});
     markPlaying();
     trackPlay();
+  });
+  video.addEventListener("playing", function () {
+    box.classList.add("is-showing");
+  });
+  document.getElementById("poster").addEventListener("error", function () {
+    document.getElementById("poster").hidden = true;
+    document.getElementById("posterBg").hidden = true;
   });
   video.addEventListener("pause", function () { mirror.pause(); });
   video.addEventListener("seeked", function () {

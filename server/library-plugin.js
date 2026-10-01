@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
+import { spawnSync } from "node:child_process";
 import Busboy from "busboy";
 import { openHistory } from "./history.js";
 import { openBox } from "./secret-box.js";
@@ -203,7 +204,22 @@ export function libraryApi(root) {
 
   function removeUpload(url) {
     if (!url || !String(url).startsWith("/uploads/")) return;
-    fs.rmSync(path.join(uploadDir, path.basename(url)), { force: true });
+    const base = path.basename(url);
+    fs.rmSync(path.join(uploadDir, base), { force: true });
+    fs.rmSync(path.join(uploadDir, base.replace(/\.[^.]+$/, "") + ".jpg"), { force: true });
+  }
+
+  function prepareVideo(dest) {
+    const ext = path.extname(dest).toLowerCase();
+    if (ext === ".mp4" || ext === ".m4v" || ext === ".mov") {
+      const fast = dest + ".faststart";
+      const copy = spawnSync("ffmpeg", ["-y", "-i", dest, "-c", "copy", "-movflags", "+faststart", fast], { timeout: 180000 });
+      if (copy.status === 0 && fs.existsSync(fast) && fs.statSync(fast).size > 1000) fs.renameSync(fast, dest);
+      else fs.rmSync(fast, { force: true });
+    }
+    const poster = dest.replace(/\.[^.]+$/, ".jpg");
+    const shot = spawnSync("ffmpeg", ["-y", "-ss", "0.2", "-i", dest, "-frames:v", "1", "-vf", "scale=720:-2", "-q:v", "3", poster], { timeout: 30000 });
+    if (shot.status !== 0) fs.rmSync(poster, { force: true });
   }
 
   function newId() {
@@ -536,6 +552,7 @@ export function libraryApi(root) {
                 return;
               }
               const url = "/uploads/" + savedName;
+              if (kind === "video") prepareVideo(path.join(uploadDir, savedName));
               mutate((current) => {
                 if (kind === "apk") {
                   const item = { id: newId(), type: "file", url, name: downloadName(original) };
