@@ -248,7 +248,7 @@
     <img id="posterBg" class="poster-bg" alt="" hidden>
     <video id="mirror" class="mirror-bg" muted autoplay loop playsinline preload="none" aria-hidden="true"></video>
     <iframe class="yt is-off" id="yt" title="Video" referrerpolicy="strict-origin-when-cross-origin" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe>
-    <video id="preview" autoplay muted loop playsinline preload="auto"></video>
+    <video id="preview" autoplay muted loop playsinline webkit-playsinline preload="auto"></video>
     <img id="poster" class="poster" alt="" hidden>
     <div class="video-fade"></div>
     <div class="watch-text">
@@ -519,8 +519,12 @@
     yt.removeAttribute("src");
     video.classList.remove("is-off");
     video.muted = true;
+    video.defaultMuted = true;
     video.autoplay = true;
     video.playsInline = true;
+    video.setAttribute("muted", "");
+    video.setAttribute("playsinline", "");
+    video.setAttribute("webkit-playsinline", "");
     try { mirror.pause(); mirror.removeAttribute("src"); } catch (e) {}
     if (!url) return;
     box.classList.remove("is-showing");
@@ -531,6 +535,28 @@
     }
     var pending = video.play();
     if (pending && pending.catch) pending.catch(function () {});
+    nudgePlayback();
+  }
+
+  var nudgeTimer = 0;
+  function nudgePlayback() {
+    clearInterval(nudgeTimer);
+    var tries = 0;
+    nudgeTimer = setInterval(function () {
+      tries += 1;
+      if (gated) { clearInterval(nudgeTimer); return; }
+      if (video.currentTime > 0.08) {
+        box.classList.add("is-play");
+        box.classList.add("is-showing");
+        clearInterval(nudgeTimer);
+        return;
+      }
+      if (video.paused) {
+        var pending = video.play();
+        if (pending && pending.catch) pending.catch(function () {});
+      }
+      if (tries > 30) clearInterval(nudgeTimer);
+    }, 200);
   }
 
   function showAt(i) {
@@ -731,7 +757,14 @@
     trackPlay();
   });
   video.addEventListener("playing", function () {
+    box.classList.add("is-play");
     box.classList.add("is-showing");
+  });
+  video.addEventListener("timeupdate", function () {
+    if (video.currentTime > 0.08) {
+      box.classList.add("is-play");
+      box.classList.add("is-showing");
+    }
   });
   document.getElementById("poster").addEventListener("error", function () {
     document.getElementById("poster").hidden = true;

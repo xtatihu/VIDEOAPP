@@ -209,16 +209,38 @@ export function libraryApi(root) {
     fs.rmSync(path.join(uploadDir, base.replace(/\.[^.]+$/, "") + ".jpg"), { force: true });
   }
 
+  function ffmpegBin() {
+    return fs.existsSync("/usr/bin/ffmpeg") ? "/usr/bin/ffmpeg" : "ffmpeg";
+  }
+
+  function moovIsFirst(file) {
+    let fd = 0;
+    try {
+      fd = fs.openSync(file, "r");
+      const buf = Buffer.alloc(512 * 1024);
+      const n = fs.readSync(fd, buf, 0, buf.length, 0);
+      const head = buf.subarray(0, n).toString("latin1");
+      const moov = head.indexOf("moov");
+      const mdat = head.indexOf("mdat");
+      return moov > 0 && (mdat < 0 || moov < mdat);
+    } catch (e) {
+      return false;
+    } finally {
+      if (fd) fs.closeSync(fd);
+    }
+  }
+
   function prepareVideo(dest) {
     const ext = path.extname(dest).toLowerCase();
-    if (ext === ".mp4" || ext === ".m4v" || ext === ".mov") {
+    const bin = ffmpegBin();
+    if ((ext === ".mp4" || ext === ".m4v" || ext === ".mov") && fs.existsSync(dest) && !moovIsFirst(dest)) {
       const fast = dest + ".faststart";
-      const copy = spawnSync("ffmpeg", ["-y", "-i", dest, "-c", "copy", "-movflags", "+faststart", fast], { timeout: 180000 });
-      if (copy.status === 0 && fs.existsSync(fast) && fs.statSync(fast).size > 1000) fs.renameSync(fast, dest);
+      const copy = spawnSync(bin, ["-y", "-i", dest, "-c", "copy", "-movflags", "+faststart", fast], { timeout: 180000 });
+      if (copy.status === 0 && fs.existsSync(fast) && fs.statSync(fast).size > 1000 && moovIsFirst(fast)) fs.renameSync(fast, dest);
       else fs.rmSync(fast, { force: true });
     }
     const poster = dest.replace(/\.[^.]+$/, ".jpg");
-    const shot = spawnSync("ffmpeg", ["-y", "-ss", "0.2", "-i", dest, "-frames:v", "1", "-vf", "scale=720:-2", "-q:v", "3", poster], { timeout: 30000 });
+    const shot = spawnSync(bin, ["-y", "-ss", "0.2", "-i", dest, "-frames:v", "1", "-update", "1", "-vf", "scale=720:-2", "-q:v", "3", poster], { timeout: 30000 });
     if (shot.status !== 0) fs.rmSync(poster, { force: true });
   }
 
