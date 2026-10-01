@@ -54,6 +54,14 @@
   .back:hover{color:#fff}
   .check{display:flex;align-items:center;gap:10px;margin:0 0 12px;color:#fff;font-size:14px;font-weight:600}
   .check input{width:18px;height:18px;accent-color:#ff1744}
+  .screen-fields.is-dim{opacity:.45}
+  .gate-sample{margin:0 0 14px;border-radius:18px;padding:18px 12px;display:flex;justify-content:center;
+    background:radial-gradient(circle at 50% 12%, rgba(255,183,3,.35), transparent 34%), linear-gradient(165deg,#1a000c 0%,#6d0024 48%,#ff1744 100%)}
+  .gate-sample .card{width:min(100%,260px);text-align:center;color:#fff;border-radius:18px;padding:16px 14px;
+    background:rgba(0,0,0,.34);border:1px solid rgba(255,255,255,.22);box-shadow:inset 0 1px 0 rgba(255,255,255,.2)}
+  .gate-sample .k{display:block;font-size:11px;letter-spacing:1.4px;font-weight:800;color:#ffd7a8}
+  .gate-sample strong{display:block;margin:8px 0 4px;font-size:20px;line-height:1.15}
+  .gate-sample .line{display:block;font-size:13px;color:#ffe4ea}
   video.preview,iframe.preview{width:100%;aspect-ratio:16/9;border-radius:12px;background:#0e1013;
     margin-bottom:12px;border:1px solid rgba(255,70,90,.35)}
   .acts{display:flex;gap:6px;flex:none;align-items:center;flex-wrap:wrap;justify-content:flex-end}
@@ -210,11 +218,27 @@
         </div>
       </div>
       <div class="block">
-        <h3 class="block-title">PREVIEW TIME</h3>
-        <label>SECONDS ON THE VIDEO SCREEN</label>
-        <input type="number" id="playSeconds" min="1" max="120" step="1" inputmode="numeric" placeholder="7">
-        <p class="hint">Default is 7. While the video is still loading, the screen shows moving colours instead of black. After these seconds the same screen becomes the download button. Tapping the video screen also downloads the APK.</p>
-        <button class="btn" id="saveSeconds" type="button">Save seconds</button>
+        <h3 class="block-title">DOWNLOAD SCREEN</h3>
+        <label class="check"><input type="checkbox" id="gateOn" checked> Show this screen on the video after the preview</label>
+        <p class="hint">On: the video plays, then this card covers it and a tap downloads the APK. Off: the video keeps playing and this card stays hidden. The download button under the video stays either way. Tapping the video still downloads while the card is hidden.</p>
+        <div id="screenFields">
+          <label for="playSeconds">SECONDS BEFORE THIS SCREEN</label>
+          <input type="number" id="playSeconds" min="1" max="120" step="1" inputmode="numeric" placeholder="7">
+          <label for="gateLabel">SMALL LABEL</label>
+          <input type="text" id="gateLabel" maxlength="40" placeholder="PREVIEW OVER" autocomplete="off">
+          <label for="gateTitle">TITLE</label>
+          <input type="text" id="gateTitle" maxlength="80" placeholder="DOWNLOAD APK 🔥" autocomplete="off">
+          <label for="gateLine">LINE UNDER THE TITLE</label>
+          <input type="text" id="gateLine" maxlength="120" placeholder="Tap here to download 💋😘" autocomplete="off">
+        </div>
+        <div class="gate-sample" id="gateSample" aria-hidden="true">
+          <div class="card">
+            <span class="k" id="gateSampleKicker">PREVIEW OVER</span>
+            <strong id="gateSampleTitle">DOWNLOAD APK 🔥</strong>
+            <span class="line" id="gateSampleLine">Tap here to download 💋😘</span>
+          </div>
+        </div>
+        <button class="btn" id="saveSeconds" type="button">Save download screen</button>
       </div>
     </div>
 
@@ -626,6 +650,7 @@
 
     if (viewingId && !videos.some(function (item) { return item.id === viewingId; })) hidePreview();
     paintSchedule(lib && lib.schedule);
+    paintScreen(lib && lib.screen);
   }
 
   function paintSchedule(job) {
@@ -802,14 +827,66 @@
     uploadVideoFiles(document.getElementById("videoFile").files);
   };
 
+  function screenText(id, fallback) {
+    var el = document.getElementById(id);
+    var value = el ? el.value.replace(/\s+/g, " ").trim() : "";
+    return value || fallback;
+  }
+
+  function paintScreenSample() {
+    var on = document.getElementById("gateOn").checked;
+    document.getElementById("screenFields").classList.toggle("is-dim", !on);
+    document.getElementById("gateSample").hidden = !on;
+    document.getElementById("gateSampleKicker").textContent = screenText("gateLabel", "PREVIEW OVER");
+    document.getElementById("gateSampleTitle").textContent = screenText("gateTitle", "DOWNLOAD APK 🔥");
+    document.getElementById("gateSampleLine").textContent = screenText("gateLine", "Tap here to download 💋😘");
+  }
+
+  function paintScreen(screen) {
+    var active = document.activeElement && document.activeElement.id;
+    if (active === "gateOn" || active === "playSeconds" || active === "gateLabel" || active === "gateTitle" || active === "gateLine") return;
+    var src = screen || {};
+    document.getElementById("gateOn").checked = src.enabled !== false;
+    var n = parseInt(src.seconds, 10);
+    document.getElementById("playSeconds").value = isFinite(n) && n >= 1 ? String(Math.min(120, n)) : "7";
+    document.getElementById("gateLabel").value = src.label || "PREVIEW OVER";
+    document.getElementById("gateTitle").value = src.title || "DOWNLOAD APK 🔥";
+    document.getElementById("gateLine").value = src.line || "Tap here to download 💋😘";
+    paintScreenSample();
+  }
+
+  ["gateOn", "playSeconds", "gateLabel", "gateTitle", "gateLine"].forEach(function (id) {
+    var el = document.getElementById(id);
+    el.addEventListener("input", paintScreenSample);
+    el.addEventListener("change", paintScreenSample);
+  });
+
   document.getElementById("saveSeconds").onclick = function () {
     var n = parseInt(document.getElementById("playSeconds").value, 10);
     if (!isFinite(n) || n < 1 || n > 120) { say("Enter seconds from 1 to 120.", false); return; }
-    if (n === 7) del("playSeconds");
-    else store("playSeconds", String(n));
-    stamp();
-    noteHistory("text", "Preview time saved", "The video screen becomes the download button after " + n + " seconds.");
-    say("Saved. The video screen becomes the download button after " + n + " seconds.", true);
+    var on = document.getElementById("gateOn").checked;
+    fetch("/api/screen", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        enabled: on,
+        seconds: n,
+        label: screenText("gateLabel", "PREVIEW OVER"),
+        title: screenText("gateTitle", "DOWNLOAD APK 🔥"),
+        line: screenText("gateLine", "Tap here to download 💋😘")
+      })
+    })
+      .then(function (r) { return r.json().then(function (body) { return { ok: r.ok, body: body }; }); })
+      .then(function (res) {
+        if (!res.ok) { say(res.body.error || "Could not save the download screen.", false); return; }
+        paintScreen(res.body.screen);
+        stamp();
+        loadHistory();
+        say(on
+          ? "Saved. After " + n + " seconds the video is covered by this download screen."
+          : "Saved. The download screen stays off and the video keeps playing.", true);
+      })
+      .catch(function () { say("Could not save the download screen.", false); });
   };
 
   function fillText() {
@@ -818,8 +895,6 @@
       el.value = read(id) || PAGE_WORDS[id] || "";
     });
     document.getElementById("show18").checked = read("show_18") !== "0";
-    var seconds = parseInt(read("playSeconds"), 10);
-    document.getElementById("playSeconds").value = isFinite(seconds) && seconds >= 1 ? String(seconds) : "7";
     fetch("/api/downloads", { cache: "no-store" })
       .then(function (r) { return r.json(); })
       .then(function (data) {
@@ -1463,7 +1538,7 @@
       fetch("/api/library/reset", { method: "POST" })
     ]).finally(function () {
       refreshAll();
-      say("Reset. The APK, videos, page text, and download count are back to the defaults. The password is unchanged.", true);
+      say("Reset. The APK, videos, page text, download screen, and download count are back to the defaults. The username and password are unchanged.", true);
     });
   };
   document.getElementById("lockBtn").onclick = function () {

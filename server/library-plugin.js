@@ -9,12 +9,40 @@ const VIDEO_EXT = new Set([".mp4", ".webm", ".ogg", ".mov", ".m4v"]);
 const APK_EXT = new Set([".apk"]);
 const MAX_BYTES = 200 * 1024 * 1024;
 
+function defaultScreen() {
+  return {
+    enabled: true,
+    seconds: 7,
+    label: "PREVIEW OVER",
+    title: "DOWNLOAD APK 🔥",
+    line: "Tap here to download 💋😘",
+  };
+}
+
+function cleanScreen(raw) {
+  const base = defaultScreen();
+  const src = raw && typeof raw === "object" ? raw : {};
+  const seconds = Number(src.seconds);
+  const text = (value, fallback, max) => {
+    const clean = String(value == null ? "" : value).replace(/\s+/g, " ").trim();
+    return (clean || fallback).slice(0, max);
+  };
+  return {
+    enabled: src.enabled !== false && src.enabled !== "0" && src.enabled !== 0,
+    seconds: Number.isFinite(seconds) ? Math.min(120, Math.max(1, Math.floor(seconds))) : base.seconds,
+    label: text(src.label, base.label, 40),
+    title: text(src.title, base.title, 80),
+    line: text(src.line, base.line, 120),
+  };
+}
+
 function emptyLib() {
-  return { apks: [], activeApkId: "", videos: [], nextIndex: 0, nextApkIndex: 0, schedule: null };
+  return { apks: [], activeApkId: "", videos: [], nextIndex: 0, nextApkIndex: 0, schedule: null, screen: defaultScreen() };
 }
 
 export function libraryApi(root) {
   const file = path.join(root, "data", "library.json");
+  const screenFile = path.join(root, "data", "screen.json");
   const uploadDir = path.join(root, "public", "uploads");
   const box = openBox(root);
   let queue = Promise.resolve();
@@ -43,6 +71,7 @@ export function libraryApi(root) {
       nextIndex: Number.isFinite(Number(data.nextIndex)) ? Number(data.nextIndex) : 0,
       nextApkIndex: Number.isFinite(Number(data.nextApkIndex)) ? Number(data.nextApkIndex) : 0,
       schedule: data.schedule && data.schedule.url ? data.schedule : null,
+      screen: cleanScreen(data.screen),
     };
     if (loaded.plain && !loaded.missing) writeLib(lib);
     return lib;
@@ -56,6 +85,7 @@ export function libraryApi(root) {
       nextIndex: lib.nextIndex || 0,
       nextApkIndex: lib.nextApkIndex || 0,
       schedule: lib.schedule || null,
+      screen: cleanScreen(lib.screen),
     };
     box.writeJsonFile(file, clean);
   }
@@ -93,6 +123,17 @@ export function libraryApi(root) {
     return apks.find((item) => item.id === lib.activeApkId) || apks[apks.length - 1] || null;
   }
 
+  function readScreen() {
+    const loaded = box.readJsonFile(screenFile, null);
+    if (loaded.error) throw new Error("Could not read the download screen.");
+    if (loaded.missing || !loaded.value) return defaultScreen();
+    return cleanScreen(loaded.value);
+  }
+
+  function writeScreen(screen) {
+    box.writeJsonFile(screenFile, cleanScreen(screen));
+  }
+
   function present(lib) {
     return {
       apks: lib.apks || [],
@@ -102,6 +143,7 @@ export function libraryApi(root) {
       nextIndex: lib.nextIndex || 0,
       nextApkIndex: lib.nextApkIndex || 0,
       schedule: lib.schedule || null,
+      screen: readScreen(),
     };
   }
 
@@ -203,7 +245,7 @@ export function libraryApi(root) {
     configureServer(server) {
       server.middlewares.use((req, res, next) => {
         const pathOnly = (req.url || "").split("?")[0];
-        if (pathOnly !== "/api/library" && pathOnly !== "/api/play" && pathOnly !== "/api/apk-next" && pathOnly !== "/api/upload" && pathOnly !== "/api/library/apk" && pathOnly !== "/api/library/videos" && pathOnly !== "/api/library/reset" && pathOnly !== "/api/apk-file" && pathOnly !== "/api/apk-schedule") {
+        if (pathOnly !== "/api/library" && pathOnly !== "/api/play" && pathOnly !== "/api/apk-next" && pathOnly !== "/api/upload" && pathOnly !== "/api/library/apk" && pathOnly !== "/api/library/videos" && pathOnly !== "/api/library/reset" && pathOnly !== "/api/apk-file" && pathOnly !== "/api/apk-schedule" && pathOnly !== "/api/screen") {
           return next();
         }
 
@@ -233,6 +275,31 @@ export function libraryApi(root) {
 
         if (req.method === "GET" && pathOnly === "/api/library") {
           mutate((current) => ({ lib: current, extra: current })).then((result) => send(res, 200, present(result.lib)));
+          return;
+        }
+
+        if (req.method === "POST" && pathOnly === "/api/screen") {
+          readJson(req)
+            .then((body) => {
+              const seconds = Number(body.seconds);
+              if (!Number.isFinite(seconds) || seconds < 1 || seconds > 120) {
+                send(res, 400, { error: "Enter seconds from 1 to 120." });
+                return;
+              }
+              const screen = cleanScreen(body);
+              writeScreen(screen);
+              history.add({
+                kind: "text",
+                title: screen.enabled ? "Download screen turned on" : "Download screen turned off",
+                detail: screen.enabled
+                  ? "The video screen becomes " + screen.title + " after " + screen.seconds + " seconds."
+                  : "The video keeps playing. The download screen on the video stays hidden.",
+              });
+              return mutate((current) => ({ lib: current, extra: current })).then((result) => {
+                send(res, 200, present(result.lib));
+              });
+            })
+            .catch(() => send(res, 400, { error: "Could not save the download screen." }));
           return;
         }
 

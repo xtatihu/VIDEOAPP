@@ -81,11 +81,22 @@
   .video-box.is-play .hue{opacity:0;transition:opacity .35s ease}
   .screen-hit{position:absolute;inset:0;z-index:7;border:0;padding:0;background:transparent;cursor:pointer}
   .gate-dl{display:none;position:absolute;inset:0;z-index:8;border:0;cursor:pointer;color:#fff;
-    font-family:inherit;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:16px;
-    background:linear-gradient(145deg,#4a0018,#ff1744 42%,#ffb703 78%,#6a1b9a);
-    background-size:220% 220%;animation:hue 3.6s ease infinite}
-  .gate-dl strong{font-size:24px;font-weight:900;letter-spacing:.2px;text-shadow:0 4px 14px rgba(0,0,0,.45)}
-  .gate-dl span{font-size:14px;font-weight:700}
+    font-family:inherit;align-items:center;justify-content:center;padding:18px 14px;
+    background:
+      radial-gradient(circle at 50% 12%, rgba(255,183,3,.35), transparent 34%),
+      linear-gradient(165deg,#1a000c 0%,#6d0024 48%,#ff1744 100%)}
+  .gate-card{width:min(100%,280px);display:flex;flex-direction:column;align-items:center;gap:8px;
+    padding:18px 16px 16px;border-radius:22px;
+    background:rgba(0,0,0,.34);border:1px solid rgba(255,255,255,.22);
+    box-shadow:0 18px 40px rgba(0,0,0,.4), inset 0 1px 0 rgba(255,255,255,.22)}
+  .gate-kicker{font-size:11px;font-weight:800;letter-spacing:1.6px;color:#ffd7a8}
+  .gate-ico{width:52px;height:52px;border-radius:16px;display:grid;place-items:center;
+    background:linear-gradient(180deg,#ff4d6d,#c4002f);
+    box-shadow:0 10px 22px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.35)}
+  .gate-ico .ic{width:26px;height:26px}
+  .gate-dl strong{font-size:22px;font-weight:900;letter-spacing:.2px;line-height:1.15;text-align:center;
+    text-shadow:0 4px 14px rgba(0,0,0,.45)}
+  .gate-dl .gate-line{font-size:13px;font-weight:700;text-align:center;color:#ffe4ea}
   .video-box.is-gate .hue,.video-box.is-gate .screen-hit,.video-box.is-gate .watch-text,
   .video-box.is-gate .sticker,.video-box.is-gate .video-fade,.video-box.is-gate .mirror-bg,
   .video-box.is-gate video,.video-box.is-gate iframe{display:none!important}
@@ -240,9 +251,13 @@
     </div>
     <div class="hue" aria-hidden="true"></div>
     <button type="button" class="screen-hit" id="screenHit" aria-label="Download the app"></button>
-    <button type="button" class="gate-dl" id="gateDl">
-      <strong id="gateMain">DOWNLOAD APK 🔥</strong>
-      <span id="gateSmall">Tap here to download 💋😘</span>
+    <button type="button" class="gate-dl" id="gateDl" aria-label="Download the app">
+      <span class="gate-card">
+        <span class="gate-kicker" id="gateKicker">PREVIEW OVER</span>
+        <span class="gate-ico" aria-hidden="true"><svg class="ic"><use href="#i-download"/></svg></span>
+        <strong id="gateMain">DOWNLOAD APK 🔥</strong>
+        <span class="gate-line" id="gateSmall">Tap here to download 💋😘</span>
+      </span>
     </button>
   </div>
 
@@ -311,18 +326,53 @@
   var gated = false;
   var playClock = false;
   var gateTimer = 0;
+  var screenReady = false;
+  var playStartedAt = 0;
+  var screenCfg = { enabled: true, seconds: 7, label: "PREVIEW OVER", title: "DOWNLOAD APK 🔥", line: "Tap here to download 💋😘" };
 
-  function playLimit() {
-    var n = parseInt(read("playSeconds"), 10);
-    if (!isFinite(n) || n < 1) return 7;
-    if (n > 120) return 120;
-    return n;
+  function clipText(value, fallback, max) {
+    var clean = String(value == null ? "" : value).replace(/\s+/g, " ").trim();
+    return (clean || fallback).slice(0, max);
+  }
+
+  function normalizeScreen(raw) {
+    var src = raw && typeof raw === "object" ? raw : {};
+    var n = parseInt(src.seconds, 10);
+    if (!isFinite(n) || n < 1) n = 7;
+    if (n > 120) n = 120;
+    return {
+      enabled: src.enabled !== false && src.enabled !== "0" && src.enabled !== 0,
+      seconds: n,
+      label: clipText(src.label, "PREVIEW OVER", 40),
+      title: clipText(src.title, "DOWNLOAD APK 🔥", 80),
+      line: clipText(src.line, "Tap here to download 💋😘", 120)
+    };
+  }
+
+  function paintGate() {
+    var kicker = document.getElementById("gateKicker");
+    var main = document.getElementById("gateMain");
+    var small = document.getElementById("gateSmall");
+    if (kicker) kicker.textContent = screenCfg.label;
+    if (main) main.textContent = screenCfg.title;
+    if (small) small.textContent = screenCfg.line;
   }
 
   function scheduleGate(ms) {
-    if (gated) return;
+    if (gated || !screenCfg.enabled) return;
     clearTimeout(gateTimer);
     gateTimer = setTimeout(showGate, ms);
+  }
+
+  function armGate() {
+    if (!screenReady || !playClock || gated) return;
+    if (!screenCfg.enabled) {
+      clearTimeout(gateTimer);
+      return;
+    }
+    var left = screenCfg.seconds * 1000 - (Date.now() - playStartedAt);
+    if (left <= 0) showGate();
+    else scheduleGate(left);
   }
 
   function revealVideo() {
@@ -336,7 +386,8 @@
     revealVideo();
     if (!playClock) {
       playClock = true;
-      scheduleGate(playLimit() * 1000);
+      playStartedAt = Date.now();
+      armGate();
     }
   }
 
@@ -358,9 +409,10 @@
   }
 
   function showGate() {
-    if (gated) return;
+    if (gated || !screenCfg.enabled) return;
     gated = true;
     clearTimeout(gateTimer);
+    paintGate();
     try { video.pause(); video.removeAttribute("src"); } catch (e) {}
     try { mirror.pause(); mirror.removeAttribute("src"); } catch (e) {}
     try { yt.removeAttribute("src"); } catch (e) {}
@@ -368,6 +420,27 @@
     box.classList.remove("is-play");
     box.classList.add("is-gate");
     trackGate();
+  }
+
+  function hideGate() {
+    if (!gated) return;
+    gated = false;
+    playClock = false;
+    clearTimeout(gateTimer);
+    box.classList.remove("is-gate");
+    showAt(playAt || 0);
+  }
+
+  function applyScreen(raw) {
+    screenCfg = normalizeScreen(raw);
+    screenReady = true;
+    paintGate();
+    if (!screenCfg.enabled) {
+      clearTimeout(gateTimer);
+      if (gated) hideGate();
+      return;
+    }
+    if (playClock) armGate();
   }
 
   function mountYouTube(id) {
@@ -472,6 +545,7 @@
       .then(function (r) { return r.json(); })
       .then(function (data) {
         var apks = (data && data.apks) || [];
+        if (data && data.screen) applyScreen(data.screen);
         if (!servingApkId || !apks.length) return;
         if (apks.some(function (item) { return item.id === servingApkId; })) return;
         applyApk(apks[0]);
@@ -491,11 +565,19 @@
       });
   }
 
+  function loadScreen() {
+    fetch("/api/library", { cache: "no-store" })
+      .then(function (r) { return r.json(); })
+      .then(function (data) { applyScreen(data && data.screen); })
+      .catch(function () { applyScreen(null); });
+  }
+
   function applyLinks() {
     loadApk();
     loadPlaylist();
     applyCopy();
     loadCount();
+    loadScreen();
   }
 
   video.addEventListener("ended", function () {
@@ -602,8 +684,7 @@
     var logoAccent = document.getElementById("logoAccent");
     var next = paintLogoWord(logoName, read("logoName") || logoName.getAttribute("data-default"), 0);
     paintLogoWord(logoAccent, read("logoAccent") || logoAccent.getAttribute("data-default"), next);
-    document.getElementById("gateMain").textContent = document.getElementById("dlMain").textContent;
-    document.getElementById("gateSmall").textContent = document.getElementById("dlSmall").textContent;
+    paintGate();
     var show = read("show_18");
     document.querySelectorAll(".js-18").forEach(function (el) {
       el.classList.toggle("is-off", show === "0");
